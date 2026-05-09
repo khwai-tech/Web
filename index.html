@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BillingSuite Pro</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<button class="mobile-menu-btn no-print" id="mobileMenuBtn"><i class="fas fa-bars"></i></button>
+
+<!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ TOPBAR Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+<div class="topbar no-print">
+  <div class="global-search-wrap">
+    <i class="fas fa-search"></i>
+    <input type="text" class="global-search-input" id="globalSearchInput" placeholder="Search invoices, products, customersÃ¢ÂÂ¦" oninput="doGlobalSearch()" autocomplete="off">
+    <div class="search-results-drop" id="globalSearchDrop"></div>
+  </div>
+  <div class="topbar-spacer"></div>
+  <div class="low-stock-banner" id="lowStockBanner" onclick="switchTab('inventory')">
+    <i class="fas fa-exclamation-triangle"></i>
+    <span id="lowStockBannerText">0 low stock items</span>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <nav class="sidebar" id="sidebar">
+    <div class="logo-wrap">
+      <h1><i class="fas fa-store" style="color:#7dcfb0;margin-right:8px"></i>BillingSuite</h1>
+      <span>Pro ÃÂ· Billing & Inventory</span>
+    </div>
+
+    <div class="nav-section">Main</div>
+    <button class="nav-item active" data-tab="dashboard"><i class="fas fa-chart-pie"></i> Dashboard</button>
+    <button class="nav-item" data-tab="invoice"><i class="fas fa-file-invoice-dollar"></i> Invoice</button>
+    <button class="nav-item" data-tab="purchase"><i class="fas fa-truck"></i> Purchase</button>
+
+    <div class="nav-section">Management</div>
+    <button class="nav-item" data-tab="inventory"><i class="fas fa-boxes"></i> Inventory</button>
+    <button class="nav-item" data-tab="products"><i class="fas fa-tag"></i> Products</button>
+    <button class="nav-item" data-tab="customers"><i class="fas fa-users"></i> Customers</button>
+
+    <div class="nav-section">Analytics</div>
+    <button class="nav-item" data-tab="report"><i class="fas fa-chart-line"></i> Reports</button>
+
+    <div class="nav-section">System</div>
+    <button class="nav-item" data-tab="settings"><i class="fas fa-cog"></i> Settings</button>
+
+    <div class="sidebar-bottom">
+      <button class="dark-toggle" id="darkToggleBtn" onclick="toggleDark()">
+        <span><i class="fas fa-moon" style="margin-right:6px"></i>Dark Mode</span>
+        <div class="toggle-pill" id="darkPill"></div>
+      </button>
+      <div class="api-status">
+        <div class="led" id="statusLed"></div>
+        <div>
+          <div style="font-size:0.75rem;color:rgba(255,255,255,0.7);font-weight:500" id="apiStatusLabel">Google Sheets</div>
+          <div style="font-size:0.65rem;color:rgba(255,255,255,0.35)" id="apiLastSync">Connecting...</div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ DASHBOARD Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <div id="dashboardPane" class="tab-pane active">
+      <div class="page-header">
+        <h2>Dashboard</h2>
+        <p id="dashDate">Today, loading...</p>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions no-print">
+        <button class="qa-btn" onclick="switchTab('invoice')"><i class="fas fa-plus-circle"></i> New Invoice</button>
+        <button class="qa-btn" onclick="switchTab('purchase')"><i class="fas fa-cart-plus"></i> New Purchase</button>
+        <button class="qa-btn" onclick="openAddProduct()"><i class="fas fa-tag"></i> Add Product</button>
+        <button class="qa-btn" onclick="switchTab('report')"><i class="fas fa-chart-bar"></i> View Reports</button>
+        <button class="qa-btn" onclick="switchTab('customers')"><i class="fas fa-user-plus"></i> Add Customer</button>
+      </div>
+
+      <div class="grid-4" style="margin-bottom:24px">
+        <div class="stat-card">
+          <div class="stat-label">Total Revenue</div>
+          <div class="stat-value" id="dashTotalRevenue">Ã¢ÂÂ¹0</div>
+          <div class="stat-change"><i class="fas fa-arrow-up"></i> From invoices</div>
+          <i class="fas fa-indian-rupee-sign stat-icon"></i>
+        </div>
+        <div class="stat-card gold">
+          <div class="stat-label">Total Purchases</div>
+          <div class="stat-value" id="dashTotalPurchases">Ã¢ÂÂ¹0</div>
+          <div class="stat-change" style="color:var(--gold)"><i class="fas fa-truck"></i> This period</div>
+          <i class="fas fa-cart-shopping stat-icon"></i>
+        </div>
+        <div class="stat-card info">
+          <div class="stat-label">Invoices Count</div>
+          <div class="stat-value" id="dashInvCount">0</div>
+          <div class="stat-change" style="color:var(--info)"><i class="fas fa-file-invoice"></i> Total created</div>
+          <i class="fas fa-file-invoice-dollar stat-icon"></i>
+        </div>
+        <div class="stat-card danger">
+          <div class="stat-label">Low Stock Items</div>
+          <div class="stat-value" id="dashLowStock">0</div>
+          <div class="stat-change" style="color:var(--danger)"><i class="fas fa-exclamation-triangle"></i> Need restock</div>
+          <i class="fas fa-boxes stat-icon"></i>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title"><i class="fas fa-receipt"></i> Recent Invoices</div>
+          <div id="dashRecentInvoices"><div class="empty-state"><i class="fas fa-file-invoice-dollar"></i><p>No invoices yet</p></div></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><i class="fas fa-truck"></i> Recent Purchases</div>
+          <div id="dashRecentPurchases"><div class="empty-state"><i class="fas fa-truck"></i><p>No purchases yet</p></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><i class="fas fa-fire"></i> Top Selling Products</div>
+        <div id="dashTopProducts"><div class="empty-state"><i class="fas fa-chart-bar"></i><p>Save invoices to see top products</p></div></div>
+      </div>
+    </div>
+
+    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ INVOICE Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <div id="invoicePane" class="tab-pane">
+      <div class="page-header flex-between">
+        <div><h2>Invoice</h2><p>Create and manage customer invoices</p></div>
+        <div class="flex-gap no-print">
+          <button class="btn btn-secondary btn-sm" id="refreshInvoiceHistoryBtn"><i class="fas fa-sync-alt"></i> Sync</button>
+          <button class="btn btn-info btn-sm" onclick="printCurrentInvoice()"><i class="fas fa-print"></i> Print Invoice</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportInvoiceCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
+        </div>
+      </div>
+
+      <div class="secondary-tabs no-print">
+        <button class="sec-tab active" data-stab="invoiceNew">New Invoice</button>
+        <button class="sec-tab" data-stab="invoiceHistory">History</button>
+      </div>
+
+      <div id="invoiceNew" class="stab-pane">
+        <div class="grid-2">
+          <div class="card" id="invoicePrintArea">
+            <!-- Print header (only visible on print) -->
+            <div class="print-header" id="invPrintHeader">
+              <div class="flex-between">
+                <div>
+                  <h1 id="printBizName">BillingSuite Pro</h1>
+                  <p id="printBizAddr"></p>
+                  <p id="printBizGst"></p>
+                </div>
+                <div style="text-align:right">
+                  <h2 style="font-family:'Syne',sans-serif;font-size:1.8rem;color:#1a4a3a">INVOICE</h2>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-title"><i class="fas fa-plus-circle"></i> New Invoice</div>
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label">Invoice #</label>
+                <input type="text" class="form-control" id="invNumber" value="INV-2026-001">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Date</label>
+                <input type="date" class="form-control" id="invDate">
+              </div>
+            </div>
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label">Customer Name</label>
+                <input type="text" class="form-control" id="customerName" placeholder="Search or add client name" list="customerList">
+                <datalist id="customerList"></datalist>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Customer Email</label>
+                <input type="email" class="form-control" id="customerEmail" placeholder="client@email.com">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Billing Address</label>
+              <textarea class="form-control" id="billingAddr" placeholder="Full address..."></textarea>
+            </div>
+            <div class="form-group no-print">
+              <label class="form-label">GST Type</label>
+              <div class="toggle-group">
+                <button class="toggle-opt active" id="gstExcBtn" onclick="setGstType('Exclusive')">Exclusive (add GST)</button>
+                <button class="toggle-opt" id="gstIncBtn" onclick="setGstType('Inclusive')">Inclusive (GST in price)</button>
+              </div>
+            </div>
+
+            <label class="form-label">Line Items</label>
+            <div class="items-table-wrap">
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>Product / Description</th>
+                    <th style="width:70px">Qty</th>
+                    <th style="width:100px">Unit Price</th>
+                    <th style="width:90px" class="no-print">GST Rate</th>
+                    <th style="width:90px">GST Amt</th>
+                    <th style="width:100px">Total</th>
+                    <th style="width:40px" class="no-print"></th>
+                  </tr>
+                </thead>
+                <tbody id="invoiceItemsBody"></tbody>
+              </table>
+            </div>
+            <button class="btn btn-secondary btn-sm no-print" id="addInvoiceItemBtn" style="margin-top:8px"><i class="fas fa-plus"></i> Add Line Item</button>
+
+            <!-- Discount -->
+            <div class="form-group no-print" style="margin-top:14px">
+              <label class="form-label">Discount</label>
+              <div class="discount-wrap">
+                <input type="number" class="form-control" id="invDiscountVal" placeholder="0" min="0" oninput="calcInvoiceTotals()" style="width:120px">
+                <button class="disc-type-btn active" id="discFlat" onclick="setDiscType('flat')">Ã¢ÂÂ¹ Flat</button>
+                <button class="disc-type-btn" id="discPct" onclick="setDiscType('pct')">% Off</button>
+              </div>
+            </div>
+
+            <div class="totals-box">
+              <div class="totals-row"><span>Subtotal</span><span id="subtotalVal">Ã¢ÂÂ¹0.00</span></div>
+              <div class="totals-row"><span id="taxLabel">GST Total</span><span id="taxVal">Ã¢ÂÂ¹0.00</span></div>
+              <div class="totals-row discount-row"><span>Discount</span><span id="discountDisplay">Ã¢ÂÂ Ã¢ÂÂ¹0.00</span></div>
+              <div class="totals-row grand"><span>Grand Total</span><span id="grandTotalVal">Ã¢ÂÂ¹0.00</span></div>
+            </div>
+
+            <div class="flex-gap no-print" style="margin-top:20px">
+              <button class="btn btn-primary" id="saveInvoiceBtn"><i class="fas fa-save"></i> Save Invoice</button>
+              <button class="btn btn-secondary" id="clearInvoiceFormBtn"><i class="fas fa-times"></i> Clear</button>
+              <button class="btn btn-gold btn-sm" onclick="printCurrentInvoice()"><i class="fas fa-print"></i> Print</button>
+            </div>
+          </div>
+
+          <div>
+            <div class="card">
+              <div class="card-title"><i class="fas fa-clock"></i> Recent Invoices</div>
+              <div id="recentInvoiceList"><div class="empty-state"><i class="fas fa-file"></i><p>No recent invoices</p></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="invoiceHistory" class="stab-pane" style="display:none">
+        <div class="card">
+          <div class="card-title flex-between" style="margin-bottom:14px">
+            <span><i class="fas fa-archive"></i> Invoice History</span>
+            <button class="btn btn-secondary btn-sm" onclick="exportInvoiceCSV()"><i class="fas fa-download"></i> Export CSV</button>
+          </div>
+          <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="invoiceSearch" placeholder="Search invoicesÃ¢ÂÂ¦" oninput="filterInvoices()"></div>
+          <div id="invoiceHistoryList"><div class="empty-state"><i class="fas fa-archive"></i><p>No invoices saved yet</p></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ PURCHASE Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <div id="purchasePane" class="tab-pane">
+      <div class="page-header flex-between">
+        <div><h2>Purchase</h2><p>Record supplier purchases & update stock</p></div>
+        <div class="flex-gap no-print">
+          <button class="btn btn-secondary btn-sm" id="refreshPurchaseHistoryBtn"><i class="fas fa-sync-alt"></i> Sync</button>
+          <button class="btn btn-info btn-sm" onclick="printCurrentPurchase()"><i class="fas fa-print"></i> Print PO</button>
+        </div>
+      </div>
+
+      <div class="secondary-tabs no-print">
+        <button class="sec-tab active" data-stab="purchaseNew">New Purchase</button>
+        <button class="sec-tab" data-stab="purchaseHistory">History</button>
+      </div>
+
+      <div id="purchaseNew" class="stab-pane">
+        <div class="grid-2">
+          <div class="card" id="purchasePrintArea">
+            <div class="print-header" id="purPrintHeader">
+              <div class="flex-between">
+                <div>
+                  <h1 id="purPrintBizName">BillingSuite Pro</h1>
+                  <p id="purPrintBizAddr"></p>
+                </div>
+                <div style="text-align:right">
+                  <h2 style="font-family:'Syne',sans-serif;font-size:1.8rem;color:#1a4a3a">PURCHASE ORDER</h2>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-title"><i class="fas fa-cart-plus"></i> New Purchase Order</div>
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label">PO #</label>
+                <input type="text" class="form-control" id="poNumber" value="PO-2026-001">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Date</label>
+                <input type="date" class="form-control" id="purchaseDate">
+              </div>
+            </div>
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label">Supplier Name</label>
+                <input type="text" class="form-control" id="supplierName" placeholder="Supplier name">
+              </div>
+              <div class="form-group no-print">
+                <label class="form-label">GST Type</label>
+                <div class="toggle-group">
+                  <button class="toggle-opt active" id="purGstExcBtn" onclick="setPurGstType('Exclusive')">Exclusive</button>
+                  <button class="toggle-opt" id="purGstIncBtn" onclick="setPurGstType('Inclusive')">Inclusive</button>
+                </div>
+              </div>
+            </div>
+
+            <label class="form-label">Purchase Items</label>
+            <div class="items-table-wrap">
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>Product / Description</th>
+                    <th style="width:70px">Qty</th>
+                    <th style="width:100px">Unit Cost</th>
+                    <th style="width:90px" class="no-print">GST Rate</th>
+                    <th style="width:90px">GST Amt</th>
+                    <th style="width:100px">Total</th>
+                    <th style="width:40px" class="no-print"></th>
+                  </tr>
+                </thead>
+                <tbody id="purchaseItemsBody"></tbody>
+              </table>
+            </div>
+            <button class="btn btn-secondary btn-sm no-print" id="addPurchaseItemBtn" style="margin-top:8px"><i class="fas fa-plus"></i> Add Item</button>
+
+            <div class="totals-box">
+              <div class="totals-row"><span>Subtotal (Base)</span><span id="purSubtotalVal">Ã¢ÂÂ¹0.00</span></div>
+              <div class="totals-row"><span id="purTaxLabel">GST Total</span><span id="purTaxVal">Ã¢ÂÂ¹0.00</span></div>
+              <div class="totals-row grand"><span>Total Purchase</span><span id="purchaseTotalSpan">Ã¢ÂÂ¹0.00</span></div>
+            </div>
+
+            <div class="flex-gap no-print" style="margin-top:20px">
+              <button class="btn btn-primary" id="savePurchaseBtn"><i class="fas fa-save"></i> Save Purchase</button>
+              <button class="btn btn-secondary" onclick="clearPurchaseForm()"><i class="fas fa-times"></i> Clear</button>
+              <button class="btn btn-gold btn-sm" onclick="printCurrentPurchase()"><i class="fas fa-print"></i> Print PO</button>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <div class="card-title"><i class="fas fa-clock"></i> Recent Purchases</div>
+              <div id="recentPurchaseList"><div class="empty-state"><i class="fas fa-truck"></i><p>No purchases yet</p></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="purchaseHistory" class="stab-pane" style="display:none">
+        <div class="card">
+          <div class="card-title"><i class="fas fa-history"></i> Purchase History</div>
+          <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="purchaseSearch" placeholder="Search purchasesÃ¢ÂÂ¦" oninput="filterPurchases()"></div>
+          <div id="purchaseHistoryList"><div class="empty-state"><i class="fas fa-truck"></i><p>No purchases saved yet</p></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ INVENTORY Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <div id="inventoryPane" class="tab-pane">
+      <div class="page-header flex-between">
+        <div><h2>Inventory</h2><p>Real-time stock levels</p></div>
+        <div class="flex-gap">
+          <button class="btn btn-secondary btn-sm" id="refreshInventoryBtn"><i class="fas fa-sync-alt"></i> Refresh</button>
+          <button class="btn btn-primary btn-sm" onclick="exportInventoryCSV()"><i class="fas fa-download"></i> Export CSV</button>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-bottom:24px">
+        <div class="kpi-box"><div class="kpi-label">Total Products</div><div class="kpi-value" id="invTotalProducts">0</div><div class="kpi-sub">Items in catalog</div></div>
+        <div class="kpi-box"><div class="kpi-label">Total Stock Value</div><div class="kpi-value" id="invTotalValue">Ã¢ÂÂ¹0</div><div class="kpi-sub">Current inventory value</div></div>
+        <div class="kpi-box"><div class="kpi-label">Low Stock Alerts</div><div class="kpi-value" id="invLowStockCount" style="color:var(--danger)">0</div><div class="kpi-sub">Below threshold (10 units)</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title flex-between" style="margin-bottom:16px">
+          <span><i class="fas fa-warehouse"></i> Stock Table</span>
+        </div>
+        <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="inventorySearch" placeholder="Search productsÃ¢ÂÂ¦" oninput="filterInventory()"></div>
+        <div class="stock-table-wrap">
+          <table class="stock-table" id="inventoryStockTable">
+            <thead><tr><th>Product ID</th><th>Product Name</th><th>Stock</th><th>Level</th><th>Unit Price</th><th>GST %</th><th>Stock Value</th><th>Status</th></tr></thead>
+            <tbody id="inventoryTableBody">
+              <tr><td colspan="8" style="text-align:center;padding:30px">
+                <div class="skeleton skel-line wide" style="margin:0 auto 8px"></div>
+                <div class="skeleton skel-line med" style="margin:0 auto"></div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ PRODUCTS Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <div id="productsPane" class="tab-pane">
+      <div class="page-header flex-between">
+        <div><h2>Products</h2><p>Manage your product catalog</p></div>
+        <button class="btn btn-primary btn-sm" onclick="openAddProduct()"><i class="fas fa-plus"></i> Add Product</button>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-tag"></i> Product Catalog</div>
+        <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="productSearch" placeholder="Search productsÃ¢ÂÂ¦" oninput="filterProducts()"></div>
+        <div class="product-grid" id="productGrid">
+          <div class="empty-state" style="grid-column:1/-1"><i class="fas fa-tags"></i><p>Load inventory to see products</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ CUSTOMERS Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <div id="customersPane" class="tab-pane">
+      <div class="page-header flex-between">
+        <div><h2>Customers</h2><p>Manage your customer base</p></div>
+        <button class="btn btn-primary btn-sm" onclick="openAddCustomer()"><i class="fas fa-user-plus"></i> Add Customer</button>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-users"></i> Customer Directory</div>
+        <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="customerSearch" placeholder="Search customersÃ¢ÂÂ¦" oninput="filterCustomers()"></div>
+        <div class="product-grid" id="customerGrid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+          <div class="empty-state" style="grid-column:1/-1"><i class="fas fa-users"></i><p>No customers yet</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ REPORT Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <div id="reportPane" class="tab-pane">
+      <div class="page-header flex-between">
+        <div><h2>Reports & Analytics</h2><p>Business performance overview</p></div>
+        <button class="btn btn-secondary btn-sm no-print" onclick="window.print()"><i class="fas fa-print"></i> Print Report</button>
+      </div>
+
+      <!-- Date Range Filter -->
+      <div class="date-filter-bar no-print">
+        <button class="date-filter-btn active" onclick="setReportRange('week',this)">This Week</button>
+        <button class="date-filter-btn" onclick="setReportRange('month',this)">This Month</button>
+        <button class="date-filter-btn" onclick="setReportRange('quarter',this)">This Quarter</button>
+        <button class="date-filter-btn" onclick="setReportRange('all',this)">All Time</button>
+        <div class="date-filter-custom">
+          <input type="date" id="reportFrom" onchange="setReportRange('custom',null)">
+          <span style="color:var(--ink3);font-size:0.8rem">to</span>
+          <input type="date" id="reportTo" onchange="setReportRange('custom',null)">
+        </div>
+      </div>
+
+      <div class="report-kpi">
+        <div class="kpi-box"><div class="kpi-label">Net Profit</div><div class="kpi-value" id="repNetProfit">Ã¢ÂÂ¹0</div><div class="kpi-sub">Revenue minus purchases</div></div>
+        <div class="kpi-box"><div class="kpi-label">GST Collected</div><div class="kpi-value" id="repGSTCollected">Ã¢ÂÂ¹0</div><div class="kpi-sub">From sales invoices</div></div>
+        <div class="kpi-box"><div class="kpi-label">GST Paid (ITC)</div><div class="kpi-value" id="repGSTPaid">Ã¢ÂÂ¹0</div><div class="kpi-sub">From purchases</div></div>
+        <div class="kpi-box"><div class="kpi-label">Net GST Payable</div><div class="kpi-value" id="repGSTNet">Ã¢ÂÂ¹0</div><div class="kpi-sub">Collected minus ITC</div></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title"><i class="fas fa-chart-bar"></i> Sales vs Purchases</div>
+          <div class="chart-container"><canvas id="reportSalesChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><i class="fas fa-chart-line"></i> Profit Trend</div>
+          <div class="chart-container"><canvas id="reportProfitChart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title"><i class="fas fa-chart-pie"></i> Revenue Breakdown</div>
+          <div class="chart-container"><canvas id="reportPieChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><i class="fas fa-star"></i> Top Selling Products</div>
+          <div id="reportTopSellingList"><div class="empty-state"><i class="fas fa-chart-bar"></i><p>No sales data yet</p></div></div>
+        </div>
+      </div>
+
+      <!-- GST Summary Report -->
+      <div class="card">
+        <div class="card-title"><i class="fas fa-receipt"></i> GST Summary Report</div>
+        <div class="grid-2">
+          <div>
+            <p style="font-size:0.8rem;color:var(--ink3);margin-bottom:14px">Filing-ready breakdown of GST collected and paid.</p>
+            <table class="gst-summary-table">
+              <thead><tr><th>Component</th><th>Collected (Sales)</th><th>Paid (Purchases)</th><th>Net</th></tr></thead>
+              <tbody id="gstSummaryBody">
+                <tr><td>CGST (50%)</td><td id="gCGSTColl">Ã¢ÂÂ¹0</td><td id="gCGSTPaid">Ã¢ÂÂ¹0</td><td id="gCGSTNet">Ã¢ÂÂ¹0</td></tr>
+                <tr><td>SGST (50%)</td><td id="gSGSTColl">Ã¢ÂÂ¹0</td><td id="gSGSTPaid">Ã¢ÂÂ¹0</td><td id="gSGSTNet">Ã¢ÂÂ¹0</td></tr>
+                <tr><td><strong>Total GST</strong></td><td id="gTotalColl">Ã¢ÂÂ¹0</td><td id="gTotalPaid">Ã¢ÂÂ¹0</td><td id="gTotalNet">Ã¢ÂÂ¹0</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="gstRateBreakdown"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ SETTINGS Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <div id="settingsPane" class="tab-pane">
+      <div class="page-header"><h2>Settings</h2><p>Business profile & preferences</p></div>
+      <div class="card">
+        <div class="settings-section">
+          <h3><i class="fas fa-building" style="margin-right:8px"></i>Business Profile</h3>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Business Name</label>
+              <input type="text" class="form-control" id="settBizName" placeholder="Your Business Name">
+            </div>
+            <div class="form-group">
+              <label class="form-label">GSTIN</label>
+              <input type="text" class="form-control" id="settGSTIN" placeholder="22AAAAA0000A1Z5">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Business Address</label>
+            <textarea class="form-control" id="settBizAddr" placeholder="Full business addressÃ¢ÂÂ¦"></textarea>
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Phone</label>
+              <input type="text" class="form-control" id="settPhone" placeholder="+91 00000 00000">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-control" id="settEmail" placeholder="business@email.com">
+            </div>
+          </div>
+        </div>
+        <div class="settings-section">
+          <h3><i class="fas fa-sliders-h" style="margin-right:8px"></i>Inventory Preferences</h3>
+          <div class="form-group">
+            <label class="form-label">Low Stock Threshold (units)</label>
+            <input type="number" class="form-control" id="settLowStockThresh" value="10" min="1" style="max-width:200px">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()"><i class="fas fa-save"></i> Save Settings</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Details</div>
+      <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<!-- Keyboard shortcut hint -->
+<div id="kbHint" style="display:none;position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 16px;border-radius:var(--r-md);font-size:0.8rem;z-index:9998;font-weight:500"></div>
+<script src="script.js"></script>
+</body>
+</html>
