@@ -1,8 +1,8 @@
-// âââ CONFIG âââââââââââââââââââââââââââââââââââ
+// ─── CONFIG ───────────────────────────────────
 const API_URL = "https://script.google.com/macros/s/AKfycbwJupk6QkzY_BMKwMD1GZwq3fMxcL_L5Ma6IOu8uxctzgLaN0OGsQgZiaZoBbrxpR-k/exec";
 let LOW_STOCK_THRESHOLD = 10;
 
-// âââ STATE ââââââââââââââââââââââââââââââââââââ
+// ─── STATE ────────────────────────────────────
 let customersArray = [];
 let inventoryStock = [];
 let invoicesArray = [];
@@ -16,7 +16,7 @@ let chartSales = null, chartProfit = null, chartPie = null;
 let reportRange = { from: null, to: null };
 let undoStack = [];
 
-// âââ SETTINGS âââââââââââââââââââââââââââââââââ
+// ─── SETTINGS ─────────────────────────────────
 let bizProfile = { name:'BillingSuite Pro', gstin:'', address:'', phone:'', email:'' };
 
 function loadSettings() {
@@ -58,7 +58,7 @@ function updatePrintHeaders() {
   if (pa) pa.textContent = bizProfile.address;
 }
 
-// âââ DARK MODE ââââââââââââââââââââââââââââââââ
+// ─── DARK MODE ────────────────────────────────
 function toggleDark() {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   setTheme(!isDark);
@@ -72,10 +72,10 @@ function loadTheme() {
   if (localStorage.getItem('bs_dark') === '1') setTheme(true);
 }
 
-// âââ UTILS ââââââââââââââââââââââââââââââââââââ
+// ─── UTILS ────────────────────────────────────
 function fmt(n) {
   const num = parseFloat(n) || 0;
-  return 'â¹' + num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return '₹' + num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 function today() { return new Date().toISOString().slice(0,10); }
 function dateLabel(d) {
@@ -118,7 +118,7 @@ function getStatusBadge(inv) {
   return '<span class="badge badge-green">Saved</span>';
 }
 
-// âââ TABS âââââââââââââââââââââââââââââââââââââ
+// ─── TABS ─────────────────────────────────────
 function initTabs() {
   document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -150,7 +150,7 @@ function switchTab(tab) {
   document.getElementById('sidebar').classList.remove('open');
 }
 
-// âââ DATE SETUP âââââââââââââââââââââââââââââââ
+// ─── DATE SETUP ───────────────────────────────
 function setupDates() {
   const d = today();
   document.getElementById('invDate').value = d;
@@ -161,7 +161,7 @@ function setupDates() {
     'Today, ' + new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 }
 
-// âââ INVOICE EDITOR (item-level GST) ââââââââââ
+// ─── INVOICE EDITOR (item-level GST) ──────────
 function renderInvoiceEditor() {
   const body = document.getElementById('invoiceItemsBody');
   body.innerHTML = invLineItems.map((it,i) => {
@@ -172,7 +172,7 @@ function renderInvoiceEditor() {
       ? it.qty * it.price
       : it.qty * it.price + gstAmt;
     return `<tr>
-      <td><input class="item-input inv-field" data-i="${i}" data-f="desc" value="${it.desc}" placeholder="Descriptionâ¦" list="invProductList"></td>
+      <td><input class="item-input inv-field" data-i="${i}" data-f="desc" value="${it.desc}" placeholder="Description…" list="invProductList"></td>
       <td><input class="item-input inv-field" data-i="${i}" data-f="qty" type="number" value="${it.qty}" min="0.01" step="0.01" style="width:60px"></td>
       <td><input class="item-input inv-field" data-i="${i}" data-f="price" type="number" value="${it.price}" min="0" step="0.01" style="width:90px"></td>
       <td class="no-print">
@@ -252,8 +252,8 @@ function calcInvoiceTotals() {
 
   document.getElementById('subtotalVal').textContent = fmt(sub);
   document.getElementById('taxVal').textContent = fmt(gstTotal);
-  document.getElementById('taxLabel').textContent = `GST Total â ${invGstType}`;
-  document.getElementById('discountDisplay').textContent = `â ${fmt(discount)}`;
+  document.getElementById('taxLabel').textContent = `GST Total — ${invGstType}`;
+  document.getElementById('discountDisplay').textContent = `– ${fmt(discount)}`;
   document.getElementById('grandTotalVal').textContent = fmt(grand);
 }
 
@@ -271,7 +271,7 @@ function setDiscType(type) {
   calcInvoiceTotals();
 }
 
-// âââ SAVE INVOICE âââââââââââââââââââââââââââââ
+// ─── SAVE INVOICE ─────────────────────────────
 function saveInvoice() {
   const invId = document.getElementById('invNumber').value.trim();
   if (!invId) { toast('Enter an invoice number', 'error'); return; }
@@ -301,7 +301,7 @@ function saveInvoice() {
     subtotal:sub, gstAmount:gstTotal, discount, grandTotal:grand, status:'paid'
   };
 
-  toast(`Sending Invoice ${invId}â¦`, 'warn');
+  toast(`Sending Invoice ${invId}…`, 'warn');
   fetch(API_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload) })
   .then(() => {
     invoicesArray.unshift({...payload, timestamp:new Date().toISOString()});
@@ -326,12 +326,12 @@ function clearInvoiceForm() {
   toast('Form cleared', 'warn');
 }
 
-// âââ RENDER INVOICE LISTS âââââââââââââââââââââ
+// ─── RENDER INVOICE LISTS ─────────────────────
 function renderInvoiceLists() {
   const makeItem = inv => `
     <div class="list-item" onclick="showInvoiceDetail('${inv.invoiceId}')">
       <div><div class="list-item-title">${inv.invoiceId}</div>
-      <div class="list-item-sub">${inv.customerName} Â· ${dateLabel(inv.date)}</div></div>
+      <div class="list-item-sub">${inv.customerName} · ${dateLabel(inv.date)}</div></div>
       <div style="text-align:right">
         <div class="list-item-amount">${fmt(inv.grandTotal)}</div>
         ${getStatusBadge(inv)}
@@ -349,7 +349,7 @@ function filterInvoices() {
   const filtered = invoicesArray.filter(i => i.invoiceId.toLowerCase().includes(q) || i.customerName.toLowerCase().includes(q) || (i.customerEmail||'').toLowerCase().includes(q));
   document.getElementById('invoiceHistoryList').innerHTML = filtered.length ? filtered.map(inv => `
     <div class="list-item" onclick="showInvoiceDetail('${inv.invoiceId}')">
-      <div><div class="list-item-title">${inv.invoiceId}</div><div class="list-item-sub">${inv.customerName} Â· ${dateLabel(inv.date)}</div></div>
+      <div><div class="list-item-title">${inv.invoiceId}</div><div class="list-item-sub">${inv.customerName} · ${dateLabel(inv.date)}</div></div>
       <div style="text-align:right"><div class="list-item-amount">${fmt(inv.grandTotal)}</div>${getStatusBadge(inv)}</div>
     </div>`).join('') : '<div class="empty-state"><i class="fas fa-search"></i><p>No results</p></div>';
 }
@@ -357,7 +357,7 @@ function filterInvoices() {
 function showInvoiceDetail(id) {
   const inv = invoicesArray.find(i => i.invoiceId===id);
   if (!inv) return;
-  document.getElementById('modalTitle').textContent = inv.invoiceId + ' â ' + inv.customerName;
+  document.getElementById('modalTitle').textContent = inv.invoiceId + ' — ' + inv.customerName;
   document.getElementById('modalBody').innerHTML = `
     <div style="font-size:0.85rem;margin-bottom:12px;color:var(--ink2)">
       <strong>Date:</strong> ${dateLabel(inv.date)} &nbsp;|&nbsp;
@@ -375,7 +375,7 @@ function showInvoiceDetail(id) {
     <div class="totals-box" style="margin-top:12px">
       <div class="totals-row"><span>Subtotal</span><span>${fmt(inv.subtotal)}</span></div>
       <div class="totals-row"><span>GST</span><span>${fmt(inv.gstAmount)}</span></div>
-      ${inv.discount ? `<div class="totals-row discount-row"><span>Discount</span><span>â ${fmt(inv.discount)}</span></div>` : ''}
+      ${inv.discount ? `<div class="totals-row discount-row"><span>Discount</span><span>– ${fmt(inv.discount)}</span></div>` : ''}
       <div class="totals-row grand"><span>Grand Total</span><span>${fmt(inv.grandTotal)}</span></div>
     </div>
     <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
@@ -423,7 +423,7 @@ function deleteInvoice(id) {
   });
 }
 
-// âââ PURCHASE EDITOR (item-level GST) âââââââââ
+// ─── PURCHASE EDITOR (item-level GST) ─────────
 function renderPurchaseEditor() {
   const body = document.getElementById('purchaseItemsBody');
   body.innerHTML = purLineItems.map((it,i) => {
@@ -432,7 +432,7 @@ function renderPurchaseEditor() {
       : it.qty * it.cost * it.gstRate;
     const total = purGstType === 'Inclusive' ? it.qty * it.cost : it.qty * it.cost + gst;
     return `<tr>
-      <td><input class="item-input pur-field" data-i="${i}" data-f="desc" value="${it.desc}" placeholder="Product nameâ¦"></td>
+      <td><input class="item-input pur-field" data-i="${i}" data-f="desc" value="${it.desc}" placeholder="Product name…"></td>
       <td><input class="item-input pur-field" data-i="${i}" data-f="qty" type="number" value="${it.qty}" min="0.01" step="0.01" style="width:60px"></td>
       <td><input class="item-input pur-field" data-i="${i}" data-f="cost" type="number" value="${it.cost}" min="0" step="0.01" style="width:90px"></td>
       <td class="no-print">
@@ -482,7 +482,7 @@ function calcPurchaseTotals() {
   });
   document.getElementById('purSubtotalVal').textContent = fmt(sub);
   document.getElementById('purTaxVal').textContent = fmt(gstTotal);
-  document.getElementById('purTaxLabel').textContent = `GST Total â ${purGstType}`;
+  document.getElementById('purTaxLabel').textContent = `GST Total — ${purGstType}`;
   document.getElementById('purchaseTotalSpan').textContent = fmt(total);
 }
 
@@ -493,7 +493,7 @@ function setPurGstType(type) {
   renderPurchaseEditor();
 }
 
-// âââ SAVE PURCHASE ââââââââââââââââââââââââââââ
+// ─── SAVE PURCHASE ────────────────────────────
 function savePurchase() {
   const poId = document.getElementById('poNumber').value.trim();
   if (!poId) { toast('Enter a PO number','error'); return; }
@@ -517,7 +517,7 @@ function savePurchase() {
     subtotal:sub, gstAmount:gstTotal, totalAmount:total
   };
 
-  toast(`Sending PO ${poId}â¦`,'warn');
+  toast(`Sending PO ${poId}…`,'warn');
   fetch(API_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload) })
   .then(() => commitPurchase(payload))
   .catch(() => commitPurchase(payload));
@@ -538,12 +538,12 @@ function clearPurchaseForm() {
   toast('Form cleared','warn');
 }
 
-// âââ RENDER PURCHASE LISTS ââââââââââââââââââââ
+// ─── RENDER PURCHASE LISTS ────────────────────
 function renderPurchaseLists() {
   const makeItem = pur => `
     <div class="list-item" onclick="showPurchaseDetail('${pur.poNumber}')">
       <div><div class="list-item-title">${pur.poNumber}</div>
-      <div class="list-item-sub">${pur.supplier} Â· ${dateLabel(pur.date)}</div></div>
+      <div class="list-item-sub">${pur.supplier} · ${dateLabel(pur.date)}</div></div>
       <div style="text-align:right">
         <div class="list-item-amount">${fmt(pur.totalAmount)}</div>
         <span class="badge badge-blue">Purchase</span>
@@ -560,14 +560,14 @@ function filterPurchases() {
   const q = document.getElementById('purchaseSearch').value.toLowerCase();
   const filtered = purchasesArray.filter(p => p.poNumber.toLowerCase().includes(q) || p.supplier.toLowerCase().includes(q));
   document.getElementById('purchaseHistoryList').innerHTML = filtered.length
-    ? filtered.map(pur => `<div class="list-item" onclick="showPurchaseDetail('${pur.poNumber}')"><div><div class="list-item-title">${pur.poNumber}</div><div class="list-item-sub">${pur.supplier} Â· ${dateLabel(pur.date)}</div></div><div style="text-align:right"><div class="list-item-amount">${fmt(pur.totalAmount)}</div></div></div>`).join('')
+    ? filtered.map(pur => `<div class="list-item" onclick="showPurchaseDetail('${pur.poNumber}')"><div><div class="list-item-title">${pur.poNumber}</div><div class="list-item-sub">${pur.supplier} · ${dateLabel(pur.date)}</div></div><div style="text-align:right"><div class="list-item-amount">${fmt(pur.totalAmount)}</div></div></div>`).join('')
     : '<div class="empty-state"><i class="fas fa-search"></i><p>No results</p></div>';
 }
 
 function showPurchaseDetail(id) {
   const pur = purchasesArray.find(p => p.poNumber===id);
   if (!pur) return;
-  document.getElementById('modalTitle').textContent = pur.poNumber + ' â ' + pur.supplier;
+  document.getElementById('modalTitle').textContent = pur.poNumber + ' — ' + pur.supplier;
   document.getElementById('modalBody').innerHTML = `
     <div style="font-size:0.85rem;margin-bottom:12px;color:var(--ink2)"><strong>Date:</strong> ${dateLabel(pur.date)} | <strong>Supplier:</strong> ${pur.supplier}</div>
     <div class="items-table-wrap"><table class="items-table">
@@ -608,7 +608,7 @@ function deletePurchase(id) {
   });
 }
 
-// âââ PRINT INVOICE / PO âââââââââââââââââââââââ
+// ─── PRINT INVOICE / PO ───────────────────────
 function printCurrentInvoice() {
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('print-target'));
   document.getElementById('invoicePane').classList.add('print-target');
@@ -625,7 +625,7 @@ function printCurrentPurchase() {
   setTimeout(() => { document.getElementById('purPrintHeader').style.display=''; }, 800);
 }
 
-// âââ EXPORT CSV âââââââââââââââââââââââââââââââ
+// ─── EXPORT CSV ───────────────────────────────
 function exportInvoiceCSV() {
   const header = 'Invoice ID,Date,Customer,Grand Total,GST,Status\n';
   const rows = invoicesArray.map(i => `${i.invoiceId},${i.date},${i.customerName},${i.grandTotal?.toFixed(2)},${i.gstAmount?.toFixed(2)},${i.status||'paid'}`).join('\n');
@@ -641,7 +641,7 @@ function downloadCSV(content, filename) {
   toast('CSV exported!','success');
 }
 
-// âââ INVENTORY ââââââââââââââââââââââââââââââââ
+// ─── INVENTORY ────────────────────────────────
 async function fetchInventoryAndReports() {
   try {
     const res = await fetch(API_URL + '?t=' + Date.now());
@@ -746,7 +746,7 @@ function exportInventoryCSV() {
   downloadCSV(header+rows,'inventory_'+today()+'.csv');
 }
 
-// âââ PRODUCTS âââââââââââââââââââââââââââââââââ
+// ─── PRODUCTS ─────────────────────────────────
 function renderProductGrid() {
   const grid=document.getElementById('productGrid');
   const q=(document.getElementById('productSearch')?.value||'').toLowerCase();
@@ -757,7 +757,7 @@ function renderProductGrid() {
       <div class="product-card-id">${p.id}</div>
       <div class="product-card-name">${p.name}</div>
       <div class="product-card-price">${fmt(p.price)}</div>
-      <div class="product-card-stock">Stock: ${p.stock} Â· GST ${((p.gstRate||0)*100).toFixed(0)}%</div>
+      <div class="product-card-stock">Stock: ${p.stock} · GST ${((p.gstRate||0)*100).toFixed(0)}%</div>
       ${p.stock<=LOW_STOCK_THRESHOLD?'<span class="badge badge-gold" style="margin-top:8px;display:inline-block">Low Stock</span>':''}
     </div>`).join('');
 }
@@ -769,12 +769,12 @@ function openAddProduct() {
     <div class="form-group"><label class="form-label">Product ID</label><input type="text" class="form-control" id="npId" placeholder="P005"></div>
     <div class="form-group"><label class="form-label">Product Name</label><input type="text" class="form-control" id="npName" placeholder="Product name"></div>
     <div class="grid-2">
-      <div class="form-group"><label class="form-label">Unit Price (â¹)</label><input type="number" class="form-control" id="npPrice" placeholder="0.00"></div>
+      <div class="form-group"><label class="form-label">Unit Price (₹)</label><input type="number" class="form-control" id="npPrice" placeholder="0.00"></div>
       <div class="form-group"><label class="form-label">Initial Stock</label><input type="number" class="form-control" id="npStock" placeholder="0"></div>
     </div>
     <div class="form-group"><label class="form-label">GST Rate</label>
       <select class="form-control" id="npGst">
-        <option value="0">0% â Exempt</option><option value="0.05">5%</option><option value="0.12">12%</option><option value="0.18" selected>18%</option><option value="0.28">28%</option>
+        <option value="0">0% — Exempt</option><option value="0.05">5%</option><option value="0.12">12%</option><option value="0.18" selected>18%</option><option value="0.28">28%</option>
       </select>
     </div>
     <div class="form-group"><label class="form-label">Reorder Threshold</label><input type="number" class="form-control" id="npThresh" value="10"></div>
@@ -795,7 +795,7 @@ function addProductLocal() {
   toast(`Product ${name} added`,'success');
 }
 
-// âââ CUSTOMERS ââââââââââââââââââââââââââââââââ
+// ─── CUSTOMERS ────────────────────────────────
 function renderCustomerGrid() {
   const grid=document.getElementById('customerGrid');
   const q=(document.getElementById('customerSearch')?.value||'').toLowerCase();
@@ -831,7 +831,7 @@ function addCustomerLocal() {
   closeModal(); renderCustomerGrid(); toast(`${name} added`,'success');
 }
 
-// âââ DASHBOARD UPDATE âââââââââââââââââââââââââ
+// ─── DASHBOARD UPDATE ─────────────────────────
 function updateDashboard() {
   const totalRevenue = invoicesArray.reduce((s,i)=>s+(i.grandTotal||0),0);
   const totalPurchases = purchasesArray.reduce((s,p)=>s+(p.totalAmount||0),0);
@@ -857,7 +857,7 @@ function generateTopProducts() {
   document.getElementById('reportTopSellingList').innerHTML=html;
 }
 
-// âââ REPORT DATE RANGE ââââââââââââââââââââââââ
+// ─── REPORT DATE RANGE ────────────────────────
 function setReportRange(type, btn) {
   const now=new Date(), y=now.getFullYear(), m=now.getMonth(), d=now.getDate();
   document.querySelectorAll('.date-filter-btn').forEach(b=>b.classList.remove('active'));
@@ -884,7 +884,7 @@ function filterByRange(arr, amtKey) {
   });
 }
 
-// âââ REPORTS ââââââââââââââââââââââââââââââââââ
+// ─── REPORTS ──────────────────────────────────
 function buildReports() {
   generateTopProducts();
   const filtInv = filterByRange(invoicesArray, 'grandTotal');
@@ -944,21 +944,21 @@ function buildReports() {
   chartSales=new Chart(document.getElementById('reportSalesChart').getContext('2d'),{
     type:'bar',
     data:{ labels:allMonths, datasets:[
-      { label:'Sales (â¹)', data:salesData, backgroundColor:'#1a4a3a', borderRadius:6 },
-      { label:'Purchases (â¹)', data:purData, backgroundColor:'#c8933a', borderRadius:6 }
+      { label:'Sales (₹)', data:salesData, backgroundColor:'#1a4a3a', borderRadius:6 },
+      { label:'Purchases (₹)', data:purData, backgroundColor:'#c8933a', borderRadius:6 }
     ]},
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top'}},
-      scales:{ y:{ticks:{callback:v=>'â¹'+v.toLocaleString('en-IN')}, grid:{color:'rgba(0,0,0,0.05)'}}, x:{grid:{display:false}} } }
+      scales:{ y:{ticks:{callback:v=>'₹'+v.toLocaleString('en-IN')}, grid:{color:'rgba(0,0,0,0.05)'}}, x:{grid:{display:false}} } }
   });
 
   if (chartProfit) chartProfit.destroy();
   chartProfit=new Chart(document.getElementById('reportProfitChart').getContext('2d'),{
     type:'line',
     data:{ labels:allMonths, datasets:[
-      { label:'Net Profit (â¹)', data:profitData, borderColor:'#2d7a62', backgroundColor:'rgba(45,122,98,0.1)', fill:true, tension:0.4, pointBackgroundColor:'#2d7a62', borderWidth:2 }
+      { label:'Net Profit (₹)', data:profitData, borderColor:'#2d7a62', backgroundColor:'rgba(45,122,98,0.1)', fill:true, tension:0.4, pointBackgroundColor:'#2d7a62', borderWidth:2 }
     ]},
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top'}},
-      scales:{ y:{ticks:{callback:v=>'â¹'+v.toLocaleString('en-IN')}, grid:{color:'rgba(0,0,0,0.05)'}}, x:{grid:{display:false}} } }
+      scales:{ y:{ticks:{callback:v=>'₹'+v.toLocaleString('en-IN')}, grid:{color:'rgba(0,0,0,0.05)'}}, x:{grid:{display:false}} } }
   });
 
   if (chartPie) chartPie.destroy();
@@ -970,16 +970,16 @@ function buildReports() {
   });
 }
 
-// âââ GLOBAL SEARCH ââââââââââââââââââââââââââââ
+// ─── GLOBAL SEARCH ────────────────────────────
 function doGlobalSearch() {
   const q=document.getElementById('globalSearchInput').value.trim().toLowerCase();
   const drop=document.getElementById('globalSearchDrop');
   if (!q) { drop.classList.remove('open'); return; }
   const results=[];
   invoicesArray.filter(i=>i.invoiceId.toLowerCase().includes(q)||i.customerName.toLowerCase().includes(q)).slice(0,3).forEach(i=>
-    results.push({ label:`${i.invoiceId} â ${i.customerName}`, tag:'Invoice', action:()=>{ switchTab('invoice'); showInvoiceDetail(i.invoiceId); } }));
+    results.push({ label:`${i.invoiceId} — ${i.customerName}`, tag:'Invoice', action:()=>{ switchTab('invoice'); showInvoiceDetail(i.invoiceId); } }));
   purchasesArray.filter(p=>p.poNumber.toLowerCase().includes(q)||p.supplier.toLowerCase().includes(q)).slice(0,3).forEach(p=>
-    results.push({ label:`${p.poNumber} â ${p.supplier}`, tag:'Purchase', action:()=>{ switchTab('purchase'); showPurchaseDetail(p.poNumber); } }));
+    results.push({ label:`${p.poNumber} — ${p.supplier}`, tag:'Purchase', action:()=>{ switchTab('purchase'); showPurchaseDetail(p.poNumber); } }));
   inventoryStock.filter(p=>p.name.toLowerCase().includes(q)||p.id.toLowerCase().includes(q)).slice(0,3).forEach(p=>
     results.push({ label:`${p.name} (${p.id})`, tag:'Product', action:()=>{ switchTab('products'); } }));
   customersArray.filter(c=>c.name.toLowerCase().includes(q)).slice(0,2).forEach(c=>
@@ -994,22 +994,22 @@ function doGlobalSearch() {
 }
 document.addEventListener('click', e=>{ if (!e.target.closest('.global-search-wrap')) document.getElementById('globalSearchDrop').classList.remove('open'); });
 
-// âââ KEYBOARD SHORTCUTS âââââââââââââââââââââââ
+// ─── KEYBOARD SHORTCUTS ───────────────────────
 document.addEventListener('keydown', e => {
   if (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT') return;
   const hint=document.getElementById('kbHint');
-  if ((e.ctrlKey||e.metaKey) && e.key==='n') { e.preventDefault(); switchTab('invoice'); hint.textContent='âN â New Invoice'; hint.style.display='block'; setTimeout(()=>hint.style.display='none',1500); }
-  if ((e.ctrlKey||e.metaKey) && e.key==='p') { e.preventDefault(); switchTab('purchase'); hint.textContent='âP â New Purchase'; hint.style.display='block'; setTimeout(()=>hint.style.display='none',1500); }
+  if ((e.ctrlKey||e.metaKey) && e.key==='n') { e.preventDefault(); switchTab('invoice'); hint.textContent='⌃N — New Invoice'; hint.style.display='block'; setTimeout(()=>hint.style.display='none',1500); }
+  if ((e.ctrlKey||e.metaKey) && e.key==='p') { e.preventDefault(); switchTab('purchase'); hint.textContent='⌃P — New Purchase'; hint.style.display='block'; setTimeout(()=>hint.style.display='none',1500); }
   if ((e.ctrlKey||e.metaKey) && e.key==='s') { e.preventDefault(); const active=document.querySelector('.tab-pane.active'); if (active?.id==='invoicePane') saveInvoice(); else if (active?.id==='purchasePane') savePurchase(); }
   if (e.key==='Escape') closeModal();
   if (e.key==='/' && !e.ctrlKey) { e.preventDefault(); document.getElementById('globalSearchInput').focus(); }
 });
 
-// âââ MODAL ââââââââââââââââââââââââââââââââââââ
+// ─── MODAL ────────────────────────────────────
 function closeModal() { document.getElementById('detailModal').classList.remove('open'); }
 document.getElementById('detailModal').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
 
-// âââ EVENT BINDINGS âââââââââââââââââââââââââââ
+// ─── EVENT BINDINGS ───────────────────────────
 document.getElementById('customerName').addEventListener('input', e => {
   const match=customersArray.find(c=>c.name.toLowerCase()===e.target.value.trim().toLowerCase());
   if (match) {
@@ -1028,7 +1028,7 @@ document.getElementById('refreshPurchaseHistoryBtn').addEventListener('click',()
 document.getElementById('refreshInventoryBtn').addEventListener('click', refreshInventory);
 document.getElementById('mobileMenuBtn').addEventListener('click',()=>{ document.getElementById('sidebar').classList.toggle('open'); });
 
-// âââ INIT âââââââââââââââââââââââââââââââââââââ
+// ─── INIT ─────────────────────────────────────
 function init() {
   loadTheme();
   setupDates();
