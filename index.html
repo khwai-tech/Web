@@ -7,17 +7,17 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <button class="mobile-menu-btn no-print" id="mobileMenuBtn"><i class="fas fa-bars"></i></button>
 
-<!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ TOPBAR Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+<!-- ─── TOPBAR ─────────────────────────────────── -->
 <div class="topbar no-print">
   <div class="global-search-wrap">
     <i class="fas fa-search"></i>
-    <input type="text" class="global-search-input" id="globalSearchInput" placeholder="Search invoices, products, customersÃ¢ÂÂ¦" oninput="doGlobalSearch()" autocomplete="off">
+    <input type="text" class="global-search-input" id="globalSearchInput" placeholder="Search invoices, products, customers…" oninput="doGlobalSearch()" autocomplete="off">
     <div class="search-results-drop" id="globalSearchDrop"></div>
   </div>
   <div class="topbar-spacer"></div>
@@ -32,7 +32,7 @@
   <nav class="sidebar" id="sidebar">
     <div class="logo-wrap">
       <h1><i class="fas fa-store" style="color:#7dcfb0;margin-right:8px"></i>BillingSuite</h1>
-      <span>Pro ÃÂ· Billing & Inventory</span>
+      <span>Pro · Billing & Inventory</span>
     </div>
 
     <div class="nav-section">Main</div>
@@ -69,7 +69,7 @@
   <!-- MAIN -->
   <main class="main">
 
-    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ DASHBOARD Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <!-- ═══════════ DASHBOARD ═══════════ -->
     <div id="dashboardPane" class="tab-pane active">
       <div class="page-header">
         <h2>Dashboard</h2>
@@ -88,13 +88,13 @@
       <div class="grid-4" style="margin-bottom:24px">
         <div class="stat-card">
           <div class="stat-label">Total Revenue</div>
-          <div class="stat-value" id="dashTotalRevenue">Ã¢ÂÂ¹0</div>
+          <div class="stat-value" id="dashTotalRevenue">₹0</div>
           <div class="stat-change"><i class="fas fa-arrow-up"></i> From invoices</div>
           <i class="fas fa-indian-rupee-sign stat-icon"></i>
         </div>
         <div class="stat-card gold">
           <div class="stat-label">Total Purchases</div>
-          <div class="stat-value" id="dashTotalPurchases">Ã¢ÂÂ¹0</div>
+          <div class="stat-value" id="dashTotalPurchases">₹0</div>
           <div class="stat-change" style="color:var(--gold)"><i class="fas fa-truck"></i> This period</div>
           <i class="fas fa-cart-shopping stat-icon"></i>
         </div>
@@ -129,7 +129,7 @@
       </div>
     </div>
 
-    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ INVOICE Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <!-- ═══════════ INVOICE ═══════════ -->
     <div id="invoicePane" class="tab-pane">
       <div class="page-header flex-between">
         <div><h2>Invoice</h2><p>Create and manage customer invoices</p></div>
@@ -220,16 +220,16 @@
               <label class="form-label">Discount</label>
               <div class="discount-wrap">
                 <input type="number" class="form-control" id="invDiscountVal" placeholder="0" min="0" oninput="calcInvoiceTotals()" style="width:120px">
-                <button class="disc-type-btn active" id="discFlat" onclick="setDiscType('flat')">Ã¢ÂÂ¹ Flat</button>
+                <button class="disc-type-btn active" id="discFlat" onclick="setDiscType('flat')">₹ Flat</button>
                 <button class="disc-type-btn" id="discPct" onclick="setDiscType('pct')">% Off</button>
               </div>
             </div>
 
             <div class="totals-box">
-              <div class="totals-row"><span>Subtotal</span><span id="subtotalVal">Ã¢ÂÂ¹0.00</span></div>
-              <div class="totals-row"><span id="taxLabel">GST Total</span><span id="taxVal">Ã¢ÂÂ¹0.00</span></div>
-              <div class="totals-row discount-row"><span>Discount</span><span id="discountDisplay">Ã¢ÂÂ Ã¢ÂÂ¹0.00</span></div>
-              <div class="totals-row grand"><span>Grand Total</span><span id="grandTotalVal">Ã¢ÂÂ¹0.00</span></div>
+              <div class="totals-row"><span>Subtotal</span><span id="subtotalVal">₹0.00</span></div>
+              <div class="totals-row"><span id="taxLabel">GST Total</span><span id="taxVal">₹0.00</span></div>
+              <div class="totals-row discount-row"><span>Discount</span><span id="discountDisplay">– ₹0.00</span></div>
+              <div class="totals-row grand"><span>Grand Total</span><span id="grandTotalVal">₹0.00</span></div>
             </div>
 
             <div class="flex-gap no-print" style="margin-top:20px">
@@ -254,13 +254,13 @@
             <span><i class="fas fa-archive"></i> Invoice History</span>
             <button class="btn btn-secondary btn-sm" onclick="exportInvoiceCSV()"><i class="fas fa-download"></i> Export CSV</button>
           </div>
-          <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="invoiceSearch" placeholder="Search invoicesÃ¢ÂÂ¦" oninput="filterInvoices()"></div>
+          <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="invoiceSearch" placeholder="Search invoices…" oninput="filterInvoices()"></div>
           <div id="invoiceHistoryList"><div class="empty-state"><i class="fas fa-archive"></i><p>No invoices saved yet</p></div></div>
         </div>
       </div>
     </div>
 
-    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ PURCHASE Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <!-- ═══════════ PURCHASE ═══════════ -->
     <div id="purchasePane" class="tab-pane">
       <div class="page-header flex-between">
         <div><h2>Purchase</h2><p>Record supplier purchases & update stock</p></div>
@@ -335,9 +335,9 @@
             <button class="btn btn-secondary btn-sm no-print" id="addPurchaseItemBtn" style="margin-top:8px"><i class="fas fa-plus"></i> Add Item</button>
 
             <div class="totals-box">
-              <div class="totals-row"><span>Subtotal (Base)</span><span id="purSubtotalVal">Ã¢ÂÂ¹0.00</span></div>
-              <div class="totals-row"><span id="purTaxLabel">GST Total</span><span id="purTaxVal">Ã¢ÂÂ¹0.00</span></div>
-              <div class="totals-row grand"><span>Total Purchase</span><span id="purchaseTotalSpan">Ã¢ÂÂ¹0.00</span></div>
+              <div class="totals-row"><span>Subtotal (Base)</span><span id="purSubtotalVal">₹0.00</span></div>
+              <div class="totals-row"><span id="purTaxLabel">GST Total</span><span id="purTaxVal">₹0.00</span></div>
+              <div class="totals-row grand"><span>Total Purchase</span><span id="purchaseTotalSpan">₹0.00</span></div>
             </div>
 
             <div class="flex-gap no-print" style="margin-top:20px">
@@ -358,13 +358,13 @@
       <div id="purchaseHistory" class="stab-pane" style="display:none">
         <div class="card">
           <div class="card-title"><i class="fas fa-history"></i> Purchase History</div>
-          <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="purchaseSearch" placeholder="Search purchasesÃ¢ÂÂ¦" oninput="filterPurchases()"></div>
+          <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="purchaseSearch" placeholder="Search purchases…" oninput="filterPurchases()"></div>
           <div id="purchaseHistoryList"><div class="empty-state"><i class="fas fa-truck"></i><p>No purchases saved yet</p></div></div>
         </div>
       </div>
     </div>
 
-    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ INVENTORY Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <!-- ═══════════ INVENTORY ═══════════ -->
     <div id="inventoryPane" class="tab-pane">
       <div class="page-header flex-between">
         <div><h2>Inventory</h2><p>Real-time stock levels</p></div>
@@ -376,7 +376,7 @@
 
       <div class="grid-3" style="margin-bottom:24px">
         <div class="kpi-box"><div class="kpi-label">Total Products</div><div class="kpi-value" id="invTotalProducts">0</div><div class="kpi-sub">Items in catalog</div></div>
-        <div class="kpi-box"><div class="kpi-label">Total Stock Value</div><div class="kpi-value" id="invTotalValue">Ã¢ÂÂ¹0</div><div class="kpi-sub">Current inventory value</div></div>
+        <div class="kpi-box"><div class="kpi-label">Total Stock Value</div><div class="kpi-value" id="invTotalValue">₹0</div><div class="kpi-sub">Current inventory value</div></div>
         <div class="kpi-box"><div class="kpi-label">Low Stock Alerts</div><div class="kpi-value" id="invLowStockCount" style="color:var(--danger)">0</div><div class="kpi-sub">Below threshold (10 units)</div></div>
       </div>
 
@@ -384,7 +384,7 @@
         <div class="card-title flex-between" style="margin-bottom:16px">
           <span><i class="fas fa-warehouse"></i> Stock Table</span>
         </div>
-        <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="inventorySearch" placeholder="Search productsÃ¢ÂÂ¦" oninput="filterInventory()"></div>
+        <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="inventorySearch" placeholder="Search products…" oninput="filterInventory()"></div>
         <div class="stock-table-wrap">
           <table class="stock-table" id="inventoryStockTable">
             <thead><tr><th>Product ID</th><th>Product Name</th><th>Stock</th><th>Level</th><th>Unit Price</th><th>GST %</th><th>Stock Value</th><th>Status</th></tr></thead>
@@ -399,7 +399,7 @@
       </div>
     </div>
 
-    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ PRODUCTS Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <!-- ═══════════ PRODUCTS ═══════════ -->
     <div id="productsPane" class="tab-pane">
       <div class="page-header flex-between">
         <div><h2>Products</h2><p>Manage your product catalog</p></div>
@@ -407,14 +407,14 @@
       </div>
       <div class="card">
         <div class="card-title"><i class="fas fa-tag"></i> Product Catalog</div>
-        <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="productSearch" placeholder="Search productsÃ¢ÂÂ¦" oninput="filterProducts()"></div>
+        <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="productSearch" placeholder="Search products…" oninput="filterProducts()"></div>
         <div class="product-grid" id="productGrid">
           <div class="empty-state" style="grid-column:1/-1"><i class="fas fa-tags"></i><p>Load inventory to see products</p></div>
         </div>
       </div>
     </div>
 
-    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ CUSTOMERS Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <!-- ═══════════ CUSTOMERS ═══════════ -->
     <div id="customersPane" class="tab-pane">
       <div class="page-header flex-between">
         <div><h2>Customers</h2><p>Manage your customer base</p></div>
@@ -422,14 +422,14 @@
       </div>
       <div class="card">
         <div class="card-title"><i class="fas fa-users"></i> Customer Directory</div>
-        <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="customerSearch" placeholder="Search customersÃ¢ÂÂ¦" oninput="filterCustomers()"></div>
+        <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="customerSearch" placeholder="Search customers…" oninput="filterCustomers()"></div>
         <div class="product-grid" id="customerGrid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
           <div class="empty-state" style="grid-column:1/-1"><i class="fas fa-users"></i><p>No customers yet</p></div>
         </div>
       </div>
     </div>
 
-    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ REPORT Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <!-- ═══════════ REPORT ═══════════ -->
     <div id="reportPane" class="tab-pane">
       <div class="page-header flex-between">
         <div><h2>Reports & Analytics</h2><p>Business performance overview</p></div>
@@ -450,10 +450,10 @@
       </div>
 
       <div class="report-kpi">
-        <div class="kpi-box"><div class="kpi-label">Net Profit</div><div class="kpi-value" id="repNetProfit">Ã¢ÂÂ¹0</div><div class="kpi-sub">Revenue minus purchases</div></div>
-        <div class="kpi-box"><div class="kpi-label">GST Collected</div><div class="kpi-value" id="repGSTCollected">Ã¢ÂÂ¹0</div><div class="kpi-sub">From sales invoices</div></div>
-        <div class="kpi-box"><div class="kpi-label">GST Paid (ITC)</div><div class="kpi-value" id="repGSTPaid">Ã¢ÂÂ¹0</div><div class="kpi-sub">From purchases</div></div>
-        <div class="kpi-box"><div class="kpi-label">Net GST Payable</div><div class="kpi-value" id="repGSTNet">Ã¢ÂÂ¹0</div><div class="kpi-sub">Collected minus ITC</div></div>
+        <div class="kpi-box"><div class="kpi-label">Net Profit</div><div class="kpi-value" id="repNetProfit">₹0</div><div class="kpi-sub">Revenue minus purchases</div></div>
+        <div class="kpi-box"><div class="kpi-label">GST Collected</div><div class="kpi-value" id="repGSTCollected">₹0</div><div class="kpi-sub">From sales invoices</div></div>
+        <div class="kpi-box"><div class="kpi-label">GST Paid (ITC)</div><div class="kpi-value" id="repGSTPaid">₹0</div><div class="kpi-sub">From purchases</div></div>
+        <div class="kpi-box"><div class="kpi-label">Net GST Payable</div><div class="kpi-value" id="repGSTNet">₹0</div><div class="kpi-sub">Collected minus ITC</div></div>
       </div>
 
       <div class="grid-2">
@@ -487,9 +487,9 @@
             <table class="gst-summary-table">
               <thead><tr><th>Component</th><th>Collected (Sales)</th><th>Paid (Purchases)</th><th>Net</th></tr></thead>
               <tbody id="gstSummaryBody">
-                <tr><td>CGST (50%)</td><td id="gCGSTColl">Ã¢ÂÂ¹0</td><td id="gCGSTPaid">Ã¢ÂÂ¹0</td><td id="gCGSTNet">Ã¢ÂÂ¹0</td></tr>
-                <tr><td>SGST (50%)</td><td id="gSGSTColl">Ã¢ÂÂ¹0</td><td id="gSGSTPaid">Ã¢ÂÂ¹0</td><td id="gSGSTNet">Ã¢ÂÂ¹0</td></tr>
-                <tr><td><strong>Total GST</strong></td><td id="gTotalColl">Ã¢ÂÂ¹0</td><td id="gTotalPaid">Ã¢ÂÂ¹0</td><td id="gTotalNet">Ã¢ÂÂ¹0</td></tr>
+                <tr><td>CGST (50%)</td><td id="gCGSTColl">₹0</td><td id="gCGSTPaid">₹0</td><td id="gCGSTNet">₹0</td></tr>
+                <tr><td>SGST (50%)</td><td id="gSGSTColl">₹0</td><td id="gSGSTPaid">₹0</td><td id="gSGSTNet">₹0</td></tr>
+                <tr><td><strong>Total GST</strong></td><td id="gTotalColl">₹0</td><td id="gTotalPaid">₹0</td><td id="gTotalNet">₹0</td></tr>
               </tbody>
             </table>
           </div>
@@ -498,7 +498,7 @@
       </div>
     </div>
 
-    <!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ SETTINGS Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+    <!-- ═══════════ SETTINGS ═══════════ -->
     <div id="settingsPane" class="tab-pane">
       <div class="page-header"><h2>Settings</h2><p>Business profile & preferences</p></div>
       <div class="card">
@@ -516,7 +516,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">Business Address</label>
-            <textarea class="form-control" id="settBizAddr" placeholder="Full business addressÃ¢ÂÂ¦"></textarea>
+            <textarea class="form-control" id="settBizAddr" placeholder="Full business address…"></textarea>
           </div>
           <div class="grid-2">
             <div class="form-group">
@@ -556,6 +556,7 @@
 
 <!-- Keyboard shortcut hint -->
 <div id="kbHint" style="display:none;position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 16px;border-radius:var(--r-md);font-size:0.8rem;z-index:9998;font-weight:500"></div>
+
 <script src="script.js"></script>
 </body>
 </html>
