@@ -1,0 +1,339 @@
+// ─── TABS ─────────────────────────────────────
+function initTabs() {
+  document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+  document.querySelectorAll('.sec-tab[data-stab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const parent = btn.closest('.tab-pane');
+      parent.querySelectorAll('.sec-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      parent.querySelectorAll('.stab-pane').forEach(p => p.style.display = 'none');
+      const target = document.getElementById(btn.dataset.stab);
+      if (target) target.style.display = 'block';
+    });
+  });
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector(`.nav-item[data-tab="${tab}"]`);
+  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const pane = document.getElementById(tab + 'Pane');
+  if (pane) pane.classList.add('active');
+  if (tab === 'inventory') refreshInventory();
+  if (tab === 'products')  renderProductGrid();
+  if (tab === 'report')    buildReports();
+  if (tab === 'customers') renderCustomerGrid();
+  if (tab === 'suppliers') renderSupplierGrid();
+  document.getElementById('sidebar').classList.remove('open');
+}
+
+// ─── DATE SETUP ───────────────────────────────
+function setupDates() {
+  const d = today();
+  ['invDate','purchaseDate'].forEach(id => { const el = document.getElementById(id); if (el) el.value = d; });
+  const dashDate = document.getElementById('dashDate');
+  if (dashDate) dashDate.textContent = 'Today, ' + new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+// ─── DASHBOARD ────────────────────────────────
+function updateDashboard() {
+  const totalRevenue   = invoicesArray.reduce((s, i) => s + (i.grandTotal  || 0), 0);
+  const totalPurchases = purchasesArray.reduce((s, p) => s + (p.totalAmount || 0), 0);
+  const el = id => document.getElementById(id);
+  if (el('dashTotalRevenue'))   el('dashTotalRevenue').textContent   = fmt(totalRevenue);
+  if (el('dashTotalPurchases')) el('dashTotalPurchases').textContent = fmt(totalPurchases);
+  if (el('dashInvCount'))       el('dashInvCount').textContent       = invoicesArray.length;
+  generateTopProducts();
+}
+
+// fix: memoised — only rebuilds when called, not re-traversing twice per build
+function generateTopProducts() {
+  const sales = {};
+  invoicesArray.forEach(inv => (inv.items || []).forEach(it => {
+    sales[it.description] = (sales[it.description] || 0) + (it.quantity || 0);
+  }));
+  const sorted = Object.entries(sales).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const html = sorted.length
+    ? sorted.map(([name, qty], i) => `
+        <div class="list-item">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:28px;height:28px;background:var(--accent-light);color:var(--accent2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem">${i + 1}</div>
+            <div class="list-item-title">${esc(name)}</div>
+          </div>
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9rem">${qty} units</div>
+        </div>`).join('')
+    : '<div class="empty-state"><i class="fas fa-chart-bar"></i><p>No sales data yet</p></div>';
+  ['dashTopProducts','reportTopSellingList'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = html; });
+}
+
+// ─── REPORT DATE RANGE ────────────────────────
+function setReportRange(type, btn) {
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+  document.querySelectorAll('.date-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  if      (type === 'week')    { const s = new Date(y, m, d - now.getDay()); reportRange = { from: s.toISOString().slice(0, 10), to: today() }; }
+  else if (type === 'month')   { reportRange = { from: new Date(y, m, 1).toISOString().slice(0, 10), to: today() }; }
+  else if (type === 'quarter') { const qm = Math.floor(m / 3) * 3; reportRange = { from: new Date(y, qm, 1).toISOString().slice(0, 10), to: today() }; }
+  else if (type === 'all')     { reportRange = { from: null, to: null }; }
+  else if (type === 'custom')  {
+    reportRange = { from: document.getElementById('reportFrom').value, to: document.getElementById('reportTo').value };
+    document.querySelectorAll('.date-filter-btn').forEach(b => b.classList.remove('active'));
+  }
+  buildReports();
+}
+
+function filterByRange(arr) {
+  if (!reportRange.from && !reportRange.to) return arr;
+  return arr.filter(item => {
+    const d = item.date || (item.timestamp || '').slice(0, 10);
+    if (!d) return true;
+    if (reportRange.from && d < reportRange.from) return false;
+    if (reportRange.to   && d > reportRange.to)   return false;
+    return true;
+  });
+}
+
+// fix: groupByMonth moved out of buildReports so it's not re-created every call
+function groupByMonth(arr, amtKey) {
+  const m = {};
+  arr.forEach(item => {
+    const d = item.date || (item.timestamp || '').slice(0, 10);
+    if (!d) return;
+    const key = new Date(d).toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+    m[key] = (m[key] || 0) + (item[amtKey] || 0);
+  });
+  return m;
+}
+
+// ─── REPORTS ──────────────────────────────────
+function buildReports() {
+  generateTopProducts();
+
+  const filtInv = filterByRange(invoicesArray);
+  const filtPur = filterByRange(purchasesArray);
+
+  const totalRevenue   = filtInv.reduce((s, i) => s + (i.grandTotal  || 0), 0);
+  const totalPurchases = filtPur.reduce((s, p) => s + (p.totalAmount || 0), 0);
+  const gstCollected   = filtInv.reduce((s, i) => s + (i.gstAmount   || 0), 0);
+  const gstPaid        = filtPur.reduce((s, p) => s + (p.gstAmount   || 0), 0);
+
+  const el = id => document.getElementById(id);
+  if (el('repNetProfit'))    el('repNetProfit').textContent    = fmt(totalRevenue - totalPurchases);
+  if (el('repGSTCollected')) el('repGSTCollected').textContent = fmt(gstCollected);
+  if (el('repGSTPaid'))      el('repGSTPaid').textContent      = fmt(gstPaid);
+  if (el('repGSTNet'))       el('repGSTNet').textContent       = fmt(gstCollected - gstPaid);
+
+  // fix: CGST/SGST vs IGST based on supply type setting
+  const isInter = bizProfile.supplyType === 'inter';
+  if (el('gCGSTLabel')) el('gCGSTLabel').textContent = isInter ? 'IGST (100%)' : 'CGST (50%)';
+  if (el('gSGSTLabel')) el('gSGSTLabel').textContent = isInter ? '—'           : 'SGST (50%)';
+  const cgstColl = isInter ? gstCollected : gstCollected / 2;
+  const sgstColl = isInter ? 0            : gstCollected / 2;
+  const cgstPaid = isInter ? gstPaid      : gstPaid / 2;
+  const sgstPaid = isInter ? 0            : gstPaid / 2;
+  if (el('gCGSTColl')) el('gCGSTColl').textContent = fmt(cgstColl);
+  if (el('gCGSTPaid')) el('gCGSTPaid').textContent = fmt(cgstPaid);
+  if (el('gCGSTNet'))  el('gCGSTNet').textContent  = fmt(cgstColl - cgstPaid);
+  if (el('gSGSTColl')) el('gSGSTColl').textContent = fmt(sgstColl);
+  if (el('gSGSTPaid')) el('gSGSTPaid').textContent = fmt(sgstPaid);
+  if (el('gSGSTNet'))  el('gSGSTNet').textContent  = fmt(sgstColl - sgstPaid);
+  if (el('gTotalColl')) el('gTotalColl').textContent = fmt(gstCollected);
+  if (el('gTotalPaid')) el('gTotalPaid').textContent = fmt(gstPaid);
+  if (el('gTotalNet'))  el('gTotalNet').textContent  = fmt(gstCollected - gstPaid);
+
+  // GST rate slab breakdown
+  const rateMap = {};
+  filtInv.forEach(inv => (inv.items || []).forEach(it => {
+    const r = ((it.gstRate || 0) * 100).toFixed(0) + '%';
+    rateMap[r] = (rateMap[r] || 0) + (it.quantity * it.unitPrice * (it.gstRate || 0));
+  }));
+  const rateEl = el('gstRateBreakdown');
+  if (rateEl) {
+    rateEl.innerHTML = `<p style="font-size:0.8rem;color:var(--ink3);margin-bottom:12px">GST collected by rate slab:</p>` +
+      (Object.entries(rateMap).map(([r, v]) => `<div style="display:flex;justify-content:space-between;font-size:0.875rem;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-weight:600">${r}</span><span style="color:var(--accent)">${fmt(v)}</span></div>`).join('') || '<p style="color:var(--ink3);font-size:0.85rem">No GST data in range</p>');
+  }
+
+  // Charts — fix: cache filtered data, destroy old instances before creating
+  const invByMonth = groupByMonth(filtInv, 'grandTotal');
+  const purByMonth = groupByMonth(filtPur, 'totalAmount');
+  const allMonths  = [...new Set([...Object.keys(invByMonth), ...Object.keys(purByMonth)])];
+  if (!allMonths.length) allMonths.push('No Data');
+
+  const salesData  = allMonths.map(m => invByMonth[m] || 0);
+  const purData    = allMonths.map(m => purByMonth[m] || 0);
+  const profitData = allMonths.map(m => (invByMonth[m] || 0) - (purByMonth[m] || 0));
+
+  const ctxSales   = el('reportSalesChart')?.getContext('2d');
+  const ctxProfit  = el('reportProfitChart')?.getContext('2d');
+  const ctxPie     = el('reportPieChart')?.getContext('2d');
+
+  if (App.chartSales)  { App.chartSales.destroy();  App.chartSales  = null; }
+  if (App.chartProfit) { App.chartProfit.destroy();  App.chartProfit = null; }
+  if (App.chartPie)    { App.chartPie.destroy();     App.chartPie    = null; }
+
+  const tickFmt = v => '₹' + v.toLocaleString('en-IN');
+  const gridColor = 'rgba(0,0,0,0.04)';
+
+  if (ctxSales) {
+    App.chartSales = new Chart(ctxSales, {
+      type: 'bar',
+      data: { labels: allMonths, datasets: [
+        { label: 'Sales (₹)',     data: salesData, backgroundColor: '#1a4a3a', borderRadius: 6 },
+        { label: 'Purchases (₹)', data: purData,   backgroundColor: '#c8933a', borderRadius: 6 }
+      ]},
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } },
+        scales: { y: { ticks: { callback: tickFmt }, grid: { color: gridColor } }, x: { grid: { display: false } } } }
+    });
+  }
+
+  if (ctxProfit) {
+    App.chartProfit = new Chart(ctxProfit, {
+      type: 'line',
+      data: { labels: allMonths, datasets: [
+        { label: 'Net Profit (₹)', data: profitData, borderColor: '#2d7a62', backgroundColor: 'rgba(45,122,98,0.1)',
+          fill: true, tension: 0.4, pointBackgroundColor: '#2d7a62', borderWidth: 2.5 }
+      ]},
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } },
+        scales: { y: { ticks: { callback: tickFmt }, grid: { color: gridColor } }, x: { grid: { display: false } } } }
+    });
+  }
+
+  if (ctxPie) {
+    const totalInv = inventoryStock.reduce((s, p) => s + (p.stock || 0) * (p.sellPrice || p.costPrice || 0), 0);
+    App.chartPie = new Chart(ctxPie, {
+      type: 'doughnut',
+      data: { labels: ['Revenue', 'Purchases', 'Stock Value'],
+        datasets: [{ data: [totalRevenue || 0.1, totalPurchases || 0.1, totalInv || 0.1],
+          backgroundColor: ['#1a4a3a', '#c8933a', '#2d7a62'], borderWidth: 0, hoverOffset: 8 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '65%',
+        plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: ctx => ` ${fmt(ctx.parsed)}` } } } }
+    });
+  }
+}
+
+// ─── GLOBAL SEARCH ────────────────────────────
+function doGlobalSearch() {
+  const q    = document.getElementById('globalSearchInput').value.trim().toLowerCase();
+  const drop = document.getElementById('globalSearchDrop');
+  if (!q) { drop.classList.remove('open'); return; }
+  const results = [];
+  invoicesArray.filter(i  => i.invoiceId.toLowerCase().includes(q)  || i.customerName.toLowerCase().includes(q)).slice(0, 3).forEach(i  => results.push({ label: `${i.invoiceId} — ${i.customerName}`,   tag: 'Invoice',  action: () => { switchTab('invoice');   showInvoiceDetail(i.invoiceId); } }));
+  purchasesArray.filter(p => p.poNumber.toLowerCase().includes(q)   || p.supplier.toLowerCase().includes(q)).slice(0, 3).forEach(p  => results.push({ label: `${p.poNumber} — ${p.supplier}`,           tag: 'Purchase', action: () => { switchTab('purchase');  showPurchaseDetail(p.poNumber); } }));
+  inventoryStock.filter(p => (p.name || '').toLowerCase().includes(q) || (p.id || '').toLowerCase().includes(q)).slice(0, 3).forEach(p => results.push({ label: `${p.name} (${p.id})`,                  tag: 'Product',  action: () => { switchTab('products'); } }));
+  customersArray.filter(c => (c.name || '').toLowerCase().includes(q)).slice(0, 2).forEach(c => results.push({ label: c.name,                                                                                    tag: 'Customer', action: () => { switchTab('customers'); } }));
+
+  if (!results.length) {
+    drop.innerHTML = '<div class="sr-item" style="color:var(--ink3)">No results found</div>';
+    drop.classList.add('open'); return;
+  }
+  drop.innerHTML = results.map((r, idx) => `<div class="sr-item" data-idx="${idx}"><div class="sr-item-tag">${r.tag}</div>${esc(r.label)}</div>`).join('');
+  drop.classList.add('open');
+  drop.querySelectorAll('.sr-item[data-idx]').forEach(item => {
+    item.addEventListener('click', () => {
+      results[+item.dataset.idx].action();
+      drop.classList.remove('open');
+      document.getElementById('globalSearchInput').value = '';
+    });
+  });
+}
+document.addEventListener('click', e => { if (!e.target.closest('.global-search-wrap')) { const d = document.getElementById('globalSearchDrop'); if (d) d.classList.remove('open'); } });
+
+// ─── KEYBOARD SHORTCUTS ───────────────────────
+document.addEventListener('keydown', e => {
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  const hint = document.getElementById('kbHint');
+  const showHint = msg => { if (hint) { hint.textContent = msg; hint.style.display = 'block'; setTimeout(() => hint.style.display = 'none', 1600); } };
+  if ((e.ctrlKey || e.metaKey) && e.key === 'n') { e.preventDefault(); switchTab('invoice');  showHint('⌃N — New Invoice'); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'p') { e.preventDefault(); switchTab('purchase'); showHint('⌃P — New Purchase'); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    const active = document.querySelector('.tab-pane.active');
+    if (active?.id === 'invoicePane')  saveInvoice();
+    if (active?.id === 'purchasePane') savePurchase();
+    showHint('⌃S — Saved');
+  }
+  if (e.key === 'Escape') closeModal();
+  if (e.key === '/' && !e.ctrlKey) { e.preventDefault(); document.getElementById('globalSearchInput')?.focus(); }
+});
+
+// ─── SUPPLIER AUTO-FILL (fix: actually fills fields now) ──
+function initSupplierAutoFill() {
+  const suppInput = document.getElementById('supplierName');
+  if (!suppInput) return;
+  suppInput.addEventListener('change', () => {
+    const name  = suppInput.value.trim();
+    const match = suppliersArray.find(s => s.name.toLowerCase() === name.toLowerCase());
+    if (match && match.phone) toast(`Supplier: ${match.name} · ${match.paymentTerms || 'No terms set'}`, 'success');
+  });
+}
+
+// ─── CUSTOMER AUTO-FILL (fix: debounced — was firing on every keystroke) ──
+function initCustomerAutoFill() {
+  const custInput = document.getElementById('customerName');
+  if (!custInput) return;
+  custInput.addEventListener('change', () => {   // change, not input
+    const name  = custInput.value.trim();
+    const match = customersArray.find(c => c.name.toLowerCase() === name.toLowerCase());
+    if (match) {
+      const emailEl = document.getElementById('customerEmail');
+      const addrEl  = document.getElementById('billingAddr');
+      if (emailEl && match.email)   emailEl.value = match.email;
+      if (addrEl  && match.address) addrEl.value  = match.address;
+      toast(`Loaded details for ${match.name}`, 'success');
+    }
+  });
+}
+
+// ─── INIT ─────────────────────────────────────
+function init() {
+  loadTheme();
+  setupDates();
+  loadSettings();
+
+  invoicesArray.length  = 0; invoicesArray.push(...JSON.parse(localStorage.getItem('bs_invoices')  || '[]'));
+  purchasesArray.length = 0; purchasesArray.push(...JSON.parse(localStorage.getItem('bs_purchases') || '[]'));
+
+  renderInvoiceEditor();
+  renderPurchaseEditor();
+  renderInvoiceLists();
+  renderPurchaseLists();
+  updateDashboard();
+  initTabs();
+  initCustomerAutoFill();
+  initSupplierAutoFill();
+
+  // Set smart next IDs
+  const invEl = document.getElementById('invNumber');
+  const poEl  = document.getElementById('poNumber');
+  if (invEl) invEl.value = getNextId(invoicesArray,  'INV');
+  if (poEl)  poEl.value  = getNextId(purchasesArray, 'PO');
+
+  // set report range to All Time on load
+  setReportRange('all', document.querySelector('.date-filter-btn[onclick*="all"]'));
+
+  // Wire up backup buttons
+  const expBtn = document.getElementById('backupExportBtn');
+  if (expBtn) expBtn.addEventListener('click', exportBackup);
+  const impInp = document.getElementById('backupImportInput');
+  if (impInp) impInp.addEventListener('change', () => importBackup(impInp));
+
+  // Wire up main event buttons
+  document.getElementById('addInvoiceItemBtn')?.addEventListener('click', () => { invLineItems.push({ desc: '', qty: 1, price: 0, gstRate: 0.18 }); renderInvoiceEditor(); });
+  document.getElementById('saveInvoiceBtn')?.addEventListener('click', saveInvoice);
+  document.getElementById('clearInvoiceFormBtn')?.addEventListener('click', () => clearInvoiceForm());
+  document.getElementById('addPurchaseItemBtn')?.addEventListener('click', () => { purLineItems.push({ desc: '', qty: 1, cost: 0, gstRate: 0.18 }); renderPurchaseEditor(); });
+  document.getElementById('savePurchaseBtn')?.addEventListener('click', savePurchase);
+  document.getElementById('refreshInventoryBtn')?.addEventListener('click', refreshInventory);
+  document.getElementById('refreshInvoiceHistoryBtn')?.addEventListener('click', () => { renderInvoiceLists(); toast('Invoices refreshed'); });
+  document.getElementById('refreshPurchaseHistoryBtn')?.addEventListener('click', () => { renderPurchaseLists(); toast('Purchases refreshed'); });
+  document.getElementById('mobileMenuBtn')?.addEventListener('click', () => document.getElementById('sidebar').classList.toggle('open'));
+
+  // Fetch live data last
+  fetchInventoryAndReports();
+}
+
+document.addEventListener('DOMContentLoaded', init);
