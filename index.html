@@ -17,22 +17,22 @@
 <div class="topbar no-print">
   <div class="global-search-wrap">
     <i class="fas fa-search"></i>
-    <input type="text" class="global-search-input" id="globalSearchInput" placeholder="Search invoices, products, customers…" oninput="doGlobalSearch()" autocomplete="off">
+    <input type="text" class="global-search-input" id="globalSearchInput" placeholder="Search invoices, products, customers… (Press /)" oninput="doGlobalSearch()" autocomplete="off">
     <div class="search-results-drop" id="globalSearchDrop"></div>
   </div>
   <div class="topbar-spacer"></div>
-  <div class="low-stock-banner" id="lowStockBanner" onclick="switchTab('inventory')">
+  <div class="low-stock-banner" id="lowStockBanner" onclick="switchTab('inventory')" style="display:none">
     <i class="fas fa-exclamation-triangle"></i>
     <span id="lowStockBannerText">0 low stock items</span>
   </div>
 </div>
 
 <div class="layout">
-  <!-- SIDEBAR -->
+  <!-- ─── SIDEBAR ─────────────────────────────── -->
   <nav class="sidebar" id="sidebar">
     <div class="logo-wrap">
       <h1><i class="fas fa-store" style="color:#7dcfb0;margin-right:8px"></i>BillingSuite</h1>
-      <span>Pro · Billing & Inventory</span>
+      <span>Pro · Billing &amp; Inventory</span>
     </div>
 
     <div class="nav-section">Main</div>
@@ -44,6 +44,7 @@
     <button class="nav-item" data-tab="inventory"><i class="fas fa-boxes"></i> Inventory</button>
     <button class="nav-item" data-tab="products"><i class="fas fa-tag"></i> Products</button>
     <button class="nav-item" data-tab="customers"><i class="fas fa-users"></i> Customers</button>
+    <button class="nav-item" data-tab="suppliers"><i class="fas fa-building"></i> Suppliers</button>
 
     <div class="nav-section">Analytics</div>
     <button class="nav-item" data-tab="report"><i class="fas fa-chart-line"></i> Reports</button>
@@ -60,29 +61,28 @@
         <div class="led" id="statusLed"></div>
         <div>
           <div style="font-size:0.75rem;color:rgba(255,255,255,0.7);font-weight:500" id="apiStatusLabel">Google Sheets</div>
-          <div style="font-size:0.65rem;color:rgba(255,255,255,0.35)" id="apiLastSync">Connecting...</div>
+          <div style="font-size:0.65rem;color:rgba(255,255,255,0.35)" id="apiLastSync">Connecting…</div>
         </div>
       </div>
     </div>
   </nav>
 
-  <!-- MAIN -->
+  <!-- ─── MAIN ───────────────────────────────── -->
   <main class="main">
 
     <!-- ═══════════ DASHBOARD ═══════════ -->
     <div id="dashboardPane" class="tab-pane active">
       <div class="page-header">
         <h2>Dashboard</h2>
-        <p id="dashDate">Today, loading...</p>
+        <p id="dashDate">Today, loading…</p>
       </div>
 
-      <!-- Quick Actions -->
       <div class="quick-actions no-print">
         <button class="qa-btn" onclick="switchTab('invoice')"><i class="fas fa-plus-circle"></i> New Invoice</button>
         <button class="qa-btn" onclick="switchTab('purchase')"><i class="fas fa-cart-plus"></i> New Purchase</button>
         <button class="qa-btn" onclick="openAddProduct()"><i class="fas fa-tag"></i> Add Product</button>
         <button class="qa-btn" onclick="switchTab('report')"><i class="fas fa-chart-bar"></i> View Reports</button>
-        <button class="qa-btn" onclick="switchTab('customers')"><i class="fas fa-user-plus"></i> Add Customer</button>
+        <button class="qa-btn" onclick="openAddCustomer()"><i class="fas fa-user-plus"></i> Add Customer</button>
       </div>
 
       <div class="grid-4" style="margin-bottom:24px">
@@ -135,34 +135,25 @@
         <div><h2>Invoice</h2><p>Create and manage customer invoices</p></div>
         <div class="flex-gap no-print">
           <button class="btn btn-secondary btn-sm" id="refreshInvoiceHistoryBtn"><i class="fas fa-sync-alt"></i> Sync</button>
-          <button class="btn btn-info btn-sm" onclick="printCurrentInvoice()"><i class="fas fa-print"></i> Print Invoice</button>
-          <button class="btn btn-secondary btn-sm" onclick="exportInvoiceCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
+          <button class="btn btn-info btn-sm" onclick="printCurrentInvoice()"><i class="fas fa-print"></i> Print</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportInvoiceCSV()"><i class="fas fa-file-csv"></i> CSV</button>
         </div>
       </div>
 
       <div class="secondary-tabs no-print">
-        <button class="sec-tab active" data-stab="invoiceNew">New Invoice</button>
+        <button class="sec-tab active" id="tabNewInvoice" data-stab="invoiceNew">New Invoice</button>
+        <button class="sec-tab" id="tabEditInvoice" data-stab="invoiceNew" style="display:none; color:var(--gold); border-bottom-color:var(--gold)">Edit Invoice</button>
+        <button class="sec-tab" data-stab="invoiceRecent">Recent</button>
         <button class="sec-tab" data-stab="invoiceHistory">History</button>
       </div>
 
+      <!-- NEW INVOICE -->
       <div id="invoiceNew" class="stab-pane">
         <div class="grid-2">
           <div class="card" id="invoicePrintArea">
-            <!-- Print header (only visible on print) -->
-            <div class="print-header" id="invPrintHeader">
-              <div class="flex-between">
-                <div>
-                  <h1 id="printBizName">BillingSuite Pro</h1>
-                  <p id="printBizAddr"></p>
-                  <p id="printBizGst"></p>
-                </div>
-                <div style="text-align:right">
-                  <h2 style="font-family:'Syne',sans-serif;font-size:1.8rem;color:#1a4a3a">INVOICE</h2>
-                </div>
-              </div>
-            </div>
+            
+            <div class="card-title" id="invoiceFormTitle"><i class="fas fa-plus-circle"></i> New Invoice</div>
 
-            <div class="card-title"><i class="fas fa-plus-circle"></i> New Invoice</div>
             <div class="grid-2">
               <div class="form-group">
                 <label class="form-label">Invoice #</label>
@@ -176,8 +167,7 @@
             <div class="grid-2">
               <div class="form-group">
                 <label class="form-label">Customer Name</label>
-                <input type="text" class="form-control" id="customerName" placeholder="Search or add client name" list="customerList">
-                <datalist id="customerList"></datalist>
+                <input type="text" class="form-control" id="customerName" placeholder="Search or type name" list="customerList">
               </div>
               <div class="form-group">
                 <label class="form-label">Customer Email</label>
@@ -186,13 +176,25 @@
             </div>
             <div class="form-group">
               <label class="form-label">Billing Address</label>
-              <textarea class="form-control" id="billingAddr" placeholder="Full address..."></textarea>
+              <textarea class="form-control" id="billingAddr" placeholder="Full address…" rows="2"></textarea>
             </div>
-            <div class="form-group no-print">
-              <label class="form-label">GST Type</label>
-              <div class="toggle-group">
-                <button class="toggle-opt active" id="gstExcBtn" onclick="setGstType('Exclusive')">Exclusive (add GST)</button>
-                <button class="toggle-opt" id="gstIncBtn" onclick="setGstType('Inclusive')">Inclusive (GST in price)</button>
+
+            <div class="grid-2 no-print">
+              <div class="form-group">
+                <label class="form-label">GST Type</label>
+                <div class="toggle-group">
+                  <button class="toggle-opt active" id="gstExcBtn" onclick="setGstType('Exclusive')">Exclusive</button>
+                  <button class="toggle-opt" id="gstIncBtn" onclick="setGstType('Inclusive')">Inclusive</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Invoice Status</label>
+                <select class="form-control" id="invStatusSelect">
+                  <option value="unpaid">Unpaid</option>
+                  <option value="paid">Paid</option>
+                  <option value="draft">Draft</option>
+                  <option value="overdue">Overdue</option>
+                </select>
               </div>
             </div>
 
@@ -201,19 +203,21 @@
               <table class="items-table">
                 <thead>
                   <tr>
-                    <th>Product / Description</th>
-                    <th style="width:70px">Qty</th>
+                    <th style="width:40%; min-width:240px">Product / Description</th>
+                    <th style="width:65px">Qty</th>
                     <th style="width:100px">Unit Price</th>
-                    <th style="width:90px" class="no-print">GST Rate</th>
+                    <th style="width:86px" class="no-print">GST %</th>
                     <th style="width:90px">GST Amt</th>
                     <th style="width:100px">Total</th>
-                    <th style="width:40px" class="no-print"></th>
+                    <th style="width:38px" class="no-print"></th>
                   </tr>
                 </thead>
                 <tbody id="invoiceItemsBody"></tbody>
               </table>
             </div>
-            <button class="btn btn-secondary btn-sm no-print" id="addInvoiceItemBtn" style="margin-top:8px"><i class="fas fa-plus"></i> Add Line Item</button>
+            <button class="btn btn-secondary btn-sm no-print" id="addInvoiceItemBtn" style="margin-top:8px">
+              <i class="fas fa-plus"></i> Add Line Item
+            </button>
 
             <!-- Discount -->
             <div class="form-group no-print" style="margin-top:14px">
@@ -237,33 +241,58 @@
               <button class="btn btn-secondary" id="clearInvoiceFormBtn"><i class="fas fa-times"></i> Clear</button>
               <button class="btn btn-gold btn-sm" onclick="printCurrentInvoice()"><i class="fas fa-print"></i> Print</button>
             </div>
-          </div>
+
+            <div class="print-footer">
+              Thank you for your business! · Generated by BillingSuite Pro
+            </div>
+          </div><!-- end invoicePrintArea -->
 
           <div>
+            <div class="no-print">
+            <div class="card">
+              <div class="card-title"><i class="fas fa-clock"></i> Quick Stats</div>
+              <div class="grid-2" style="gap:10px;margin-bottom:0">
+                <div class="kpi-box"><div class="kpi-label">This Month</div><div class="kpi-value" id="invMonthCount" style="font-size:1.1rem">0</div></div>
+                <div class="kpi-box"><div class="kpi-label">Unpaid</div><div class="kpi-value" id="invUnpaidCount" style="font-size:1.1rem;color:var(--danger)">0</div></div>
+              </div></div>
+            </div>
+            <div class="no-print">
             <div class="card">
               <div class="card-title"><i class="fas fa-clock"></i> Recent Invoices</div>
               <div id="recentInvoiceList"><div class="empty-state"><i class="fas fa-file"></i><p>No recent invoices</p></div></div>
-            </div>
+            </div></div>
           </div>
+        </div>
+      </div><!-- end invoiceNew -->
+
+      <!-- RECENT sub-tab -->
+      <div id="invoiceRecent" class="stab-pane" style="display:none">
+        <div class="card">
+          <div class="card-title"><i class="fas fa-clock"></i> Recent Invoices</div>
+          <div id="invoiceRecentList"><div class="empty-state"><i class="fas fa-file-invoice"></i><p>No invoices yet</p></div></div>
         </div>
       </div>
 
+      <!-- HISTORY sub-tab -->
       <div id="invoiceHistory" class="stab-pane" style="display:none">
         <div class="card">
           <div class="card-title flex-between" style="margin-bottom:14px">
             <span><i class="fas fa-archive"></i> Invoice History</span>
             <button class="btn btn-secondary btn-sm" onclick="exportInvoiceCSV()"><i class="fas fa-download"></i> Export CSV</button>
           </div>
-          <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="invoiceSearch" placeholder="Search invoices…" oninput="filterInvoices()"></div>
+          <div class="search-wrap">
+            <i class="fas fa-search"></i>
+            <input type="text" class="search-input" id="invoiceSearch" placeholder="Search by ID, customer, email…" oninput="filterInvoices()">
+          </div>
           <div id="invoiceHistoryList"><div class="empty-state"><i class="fas fa-archive"></i><p>No invoices saved yet</p></div></div>
         </div>
       </div>
-    </div>
+    </div><!-- end invoicePane -->
 
     <!-- ═══════════ PURCHASE ═══════════ -->
     <div id="purchasePane" class="tab-pane">
       <div class="page-header flex-between">
-        <div><h2>Purchase</h2><p>Record supplier purchases & update stock</p></div>
+        <div><h2>Purchase</h2><p>Record supplier purchases &amp; update stock</p></div>
         <div class="flex-gap no-print">
           <button class="btn btn-secondary btn-sm" id="refreshPurchaseHistoryBtn"><i class="fas fa-sync-alt"></i> Sync</button>
           <button class="btn btn-info btn-sm" onclick="printCurrentPurchase()"><i class="fas fa-print"></i> Print PO</button>
@@ -271,26 +300,17 @@
       </div>
 
       <div class="secondary-tabs no-print">
-        <button class="sec-tab active" data-stab="purchaseNew">New Purchase</button>
+        <button class="sec-tab active" id="tabNewPurchase" data-stab="purchaseNew">New Purchase</button>
+        <button class="sec-tab" id="tabEditPurchase" data-stab="purchaseNew" style="display:none; color:var(--gold); border-bottom-color:var(--gold)">Edit Purchase</button>
         <button class="sec-tab" data-stab="purchaseHistory">History</button>
       </div>
 
       <div id="purchaseNew" class="stab-pane">
         <div class="grid-2">
           <div class="card" id="purchasePrintArea">
-            <div class="print-header" id="purPrintHeader">
-              <div class="flex-between">
-                <div>
-                  <h1 id="purPrintBizName">BillingSuite Pro</h1>
-                  <p id="purPrintBizAddr"></p>
-                </div>
-                <div style="text-align:right">
-                  <h2 style="font-family:'Syne',sans-serif;font-size:1.8rem;color:#1a4a3a">PURCHASE ORDER</h2>
-                </div>
-              </div>
-            </div>
-
+            
             <div class="card-title"><i class="fas fa-cart-plus"></i> New Purchase Order</div>
+
             <div class="grid-2">
               <div class="form-group">
                 <label class="form-label">PO #</label>
@@ -301,10 +321,11 @@
                 <input type="date" class="form-control" id="purchaseDate">
               </div>
             </div>
+
             <div class="grid-2">
               <div class="form-group">
                 <label class="form-label">Supplier Name</label>
-                <input type="text" class="form-control" id="supplierName" placeholder="Supplier name">
+                <input type="text" class="form-control" id="supplierName" placeholder="Search or type supplier" list="supplierList">
               </div>
               <div class="form-group no-print">
                 <label class="form-label">GST Type</label>
@@ -320,19 +341,21 @@
               <table class="items-table">
                 <thead>
                   <tr>
-                    <th>Product / Description</th>
-                    <th style="width:70px">Qty</th>
+                    <th style="width:40%; min-width:240px">Product / Description</th>
+                    <th style="width:65px">Qty</th>
                     <th style="width:100px">Unit Cost</th>
-                    <th style="width:90px" class="no-print">GST Rate</th>
+                    <th style="width:86px" class="no-print">GST %</th>
                     <th style="width:90px">GST Amt</th>
                     <th style="width:100px">Total</th>
-                    <th style="width:40px" class="no-print"></th>
+                    <th style="width:38px" class="no-print"></th>
                   </tr>
                 </thead>
                 <tbody id="purchaseItemsBody"></tbody>
               </table>
             </div>
-            <button class="btn btn-secondary btn-sm no-print" id="addPurchaseItemBtn" style="margin-top:8px"><i class="fas fa-plus"></i> Add Item</button>
+            <button class="btn btn-secondary btn-sm no-print" id="addPurchaseItemBtn" style="margin-top:8px">
+              <i class="fas fa-plus"></i> Add Item
+            </button>
 
             <div class="totals-box">
               <div class="totals-row"><span>Subtotal (Base)</span><span id="purSubtotalVal">₹0.00</span></div>
@@ -345,29 +368,38 @@
               <button class="btn btn-secondary" onclick="clearPurchaseForm()"><i class="fas fa-times"></i> Clear</button>
               <button class="btn btn-gold btn-sm" onclick="printCurrentPurchase()"><i class="fas fa-print"></i> Print PO</button>
             </div>
-          </div>
+
+            <div class="print-footer">Thank you for your order! · Generated by BillingSuite Pro</div>
+          </div><!-- end purchasePrintArea -->
+
           <div>
+            <div class="no-print">
             <div class="card">
               <div class="card-title"><i class="fas fa-clock"></i> Recent Purchases</div>
               <div id="recentPurchaseList"><div class="empty-state"><i class="fas fa-truck"></i><p>No purchases yet</p></div></div>
-            </div>
+            </div></div>
           </div>
         </div>
-      </div>
+      </div><!-- end purchaseNew -->
 
       <div id="purchaseHistory" class="stab-pane" style="display:none">
         <div class="card">
-          <div class="card-title"><i class="fas fa-history"></i> Purchase History</div>
-          <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="purchaseSearch" placeholder="Search purchases…" oninput="filterPurchases()"></div>
+          <div class="card-title flex-between" style="margin-bottom:14px">
+            <span><i class="fas fa-history"></i> Purchase History</span>
+          </div>
+          <div class="search-wrap">
+            <i class="fas fa-search"></i>
+            <input type="text" class="search-input" id="purchaseSearch" placeholder="Search by PO number or supplier…" oninput="filterPurchases()">
+          </div>
           <div id="purchaseHistoryList"><div class="empty-state"><i class="fas fa-truck"></i><p>No purchases saved yet</p></div></div>
         </div>
       </div>
-    </div>
+    </div><!-- end purchasePane -->
 
     <!-- ═══════════ INVENTORY ═══════════ -->
     <div id="inventoryPane" class="tab-pane">
       <div class="page-header flex-between">
-        <div><h2>Inventory</h2><p>Real-time stock levels</p></div>
+        <div><h2>Inventory</h2><p>Real-time stock levels &amp; valuation</p></div>
         <div class="flex-gap">
           <button class="btn btn-secondary btn-sm" id="refreshInventoryBtn"><i class="fas fa-sync-alt"></i> Refresh</button>
           <button class="btn btn-primary btn-sm" onclick="exportInventoryCSV()"><i class="fas fa-download"></i> Export CSV</button>
@@ -376,22 +408,38 @@
 
       <div class="grid-3" style="margin-bottom:24px">
         <div class="kpi-box"><div class="kpi-label">Total Products</div><div class="kpi-value" id="invTotalProducts">0</div><div class="kpi-sub">Items in catalog</div></div>
-        <div class="kpi-box"><div class="kpi-label">Total Stock Value</div><div class="kpi-value" id="invTotalValue">₹0</div><div class="kpi-sub">Current inventory value</div></div>
-        <div class="kpi-box"><div class="kpi-label">Low Stock Alerts</div><div class="kpi-value" id="invLowStockCount" style="color:var(--danger)">0</div><div class="kpi-sub">Below threshold (10 units)</div></div>
+        <div class="kpi-box"><div class="kpi-label">Total Stock Value</div><div class="kpi-value" id="invTotalValue">₹0</div><div class="kpi-sub">At selling price</div></div>
+        <div class="kpi-box"><div class="kpi-label">Low Stock Alerts</div><div class="kpi-value" id="invLowStockCount" style="color:var(--danger)">0</div><div class="kpi-sub">Below threshold</div></div>
       </div>
 
       <div class="card">
         <div class="card-title flex-between" style="margin-bottom:16px">
           <span><i class="fas fa-warehouse"></i> Stock Table</span>
         </div>
-        <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="inventorySearch" placeholder="Search products…" oninput="filterInventory()"></div>
+        <div class="search-wrap">
+          <i class="fas fa-search"></i>
+          <input type="text" class="search-input" id="inventorySearch" placeholder="Search by name or ID…" oninput="filterInventory()">
+        </div>
         <div class="stock-table-wrap">
           <table class="stock-table" id="inventoryStockTable">
-            <thead><tr><th>Product ID</th><th>Product Name</th><th>Stock</th><th>Level</th><th>Unit Price</th><th>GST %</th><th>Stock Value</th><th>Status</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Product ID</th>
+                <th>Name</th>
+                <th>Stock</th>
+                <th>Level</th>
+                <th>Sell Price</th>
+                <th>Cost Price</th>
+                <th>GST %</th>
+                <th>Stock Value</th>
+                <th>Margin</th>
+                <th>Status</th>
+              </tr>
+            </thead>
             <tbody id="inventoryTableBody">
-              <tr><td colspan="8" style="text-align:center;padding:30px">
+              <tr><td colspan="10" style="text-align:center;padding:30px">
                 <div class="skeleton skel-line wide" style="margin:0 auto 8px"></div>
-                <div class="skeleton skel-line med" style="margin:0 auto"></div>
+                <div class="skeleton skel-line med"  style="margin:0 auto"></div>
               </td></tr>
             </tbody>
           </table>
@@ -403,13 +451,19 @@
     <div id="productsPane" class="tab-pane">
       <div class="page-header flex-between">
         <div><h2>Products</h2><p>Manage your product catalog</p></div>
-        <button class="btn btn-primary btn-sm" onclick="openAddProduct()"><i class="fas fa-plus"></i> Add Product</button>
+        <div class="flex-gap">
+          <button class="btn btn-secondary btn-sm" onclick="toggleProductView()"><i class="fas fa-th-list"></i> Toggle View</button>
+          <button class="btn btn-primary btn-sm" onclick="openAddProduct()"><i class="fas fa-plus"></i> Add Product</button>
+        </div>
       </div>
       <div class="card">
         <div class="card-title"><i class="fas fa-tag"></i> Product Catalog</div>
-        <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="productSearch" placeholder="Search products…" oninput="filterProducts()"></div>
+        <div class="search-wrap">
+          <i class="fas fa-search"></i>
+          <input type="text" class="search-input" id="productSearch" placeholder="Search products…" oninput="filterProducts()">
+        </div>
         <div class="product-grid" id="productGrid">
-          <div class="empty-state" style="grid-column:1/-1"><i class="fas fa-tags"></i><p>Load inventory to see products</p></div>
+          <div class="empty-state" style="grid-column:1/-1"><i class="fas fa-tags"></i><p>No products yet — add one or sync from Sheets</p></div>
         </div>
       </div>
     </div>
@@ -417,31 +471,51 @@
     <!-- ═══════════ CUSTOMERS ═══════════ -->
     <div id="customersPane" class="tab-pane">
       <div class="page-header flex-between">
-        <div><h2>Customers</h2><p>Manage your customer base</p></div>
+        <div><h2>Customers</h2><p>Customer directory &amp; ledger</p></div>
         <button class="btn btn-primary btn-sm" onclick="openAddCustomer()"><i class="fas fa-user-plus"></i> Add Customer</button>
       </div>
       <div class="card">
         <div class="card-title"><i class="fas fa-users"></i> Customer Directory</div>
-        <div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-input" id="customerSearch" placeholder="Search customers…" oninput="filterCustomers()"></div>
+        <div class="search-wrap">
+          <i class="fas fa-search"></i>
+          <input type="text" class="search-input" id="customerSearch" placeholder="Search by name or email…" oninput="filterCustomers()">
+        </div>
         <div class="product-grid" id="customerGrid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
           <div class="empty-state" style="grid-column:1/-1"><i class="fas fa-users"></i><p>No customers yet</p></div>
         </div>
       </div>
     </div>
 
-    <!-- ═══════════ REPORT ═══════════ -->
+    <!-- ═══════════ SUPPLIERS ═══════════ -->
+    <div id="suppliersPane" class="tab-pane">
+      <div class="page-header flex-between">
+        <div><h2>Suppliers</h2><p>Supplier directory &amp; purchase history</p></div>
+        <button class="btn btn-primary btn-sm" onclick="openAddSupplier()"><i class="fas fa-plus"></i> Add Supplier</button>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-building"></i> Supplier Directory</div>
+        <div class="search-wrap">
+          <i class="fas fa-search"></i>
+          <input type="text" class="search-input" id="supplierSearch" placeholder="Search suppliers…" oninput="filterSuppliers()">
+        </div>
+        <div class="product-grid" id="supplierGrid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+          <div class="empty-state" style="grid-column:1/-1"><i class="fas fa-building"></i><p>No suppliers yet</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ REPORTS ═══════════ -->
     <div id="reportPane" class="tab-pane">
       <div class="page-header flex-between">
-        <div><h2>Reports & Analytics</h2><p>Business performance overview</p></div>
+        <div><h2>Reports &amp; Analytics</h2><p>Business performance overview</p></div>
         <button class="btn btn-secondary btn-sm no-print" onclick="window.print()"><i class="fas fa-print"></i> Print Report</button>
       </div>
 
-      <!-- Date Range Filter -->
       <div class="date-filter-bar no-print">
-        <button class="date-filter-btn active" onclick="setReportRange('week',this)">This Week</button>
+        <button class="date-filter-btn" onclick="setReportRange('week',this)">This Week</button>
         <button class="date-filter-btn" onclick="setReportRange('month',this)">This Month</button>
         <button class="date-filter-btn" onclick="setReportRange('quarter',this)">This Quarter</button>
-        <button class="date-filter-btn" onclick="setReportRange('all',this)">All Time</button>
+        <button class="date-filter-btn active" onclick="setReportRange('all',this)">All Time</button>
         <div class="date-filter-custom">
           <input type="date" id="reportFrom" onchange="setReportRange('custom',null)">
           <span style="color:var(--ink3);font-size:0.8rem">to</span>
@@ -478,17 +552,19 @@
         </div>
       </div>
 
-      <!-- GST Summary Report -->
+      <!-- GST Summary -->
       <div class="card">
         <div class="card-title"><i class="fas fa-receipt"></i> GST Summary Report</div>
         <div class="grid-2">
           <div>
-            <p style="font-size:0.8rem;color:var(--ink3);margin-bottom:14px">Filing-ready breakdown of GST collected and paid.</p>
+            <p style="font-size:0.8rem;color:var(--ink3);margin-bottom:14px">Filing-ready breakdown. Supply type (Intra/Inter-state) is set in Settings.</p>
             <table class="gst-summary-table">
-              <thead><tr><th>Component</th><th>Collected (Sales)</th><th>Paid (Purchases)</th><th>Net</th></tr></thead>
-              <tbody id="gstSummaryBody">
-                <tr><td>CGST (50%)</td><td id="gCGSTColl">₹0</td><td id="gCGSTPaid">₹0</td><td id="gCGSTNet">₹0</td></tr>
-                <tr><td>SGST (50%)</td><td id="gSGSTColl">₹0</td><td id="gSGSTPaid">₹0</td><td id="gSGSTNet">₹0</td></tr>
+              <thead>
+                <tr><th>Component</th><th>Collected (Sales)</th><th>Paid (Purchases)</th><th>Net</th></tr>
+              </thead>
+              <tbody>
+                <tr><td id="gCGSTLabel">CGST (50%)</td><td id="gCGSTColl">₹0</td><td id="gCGSTPaid">₹0</td><td id="gCGSTNet">₹0</td></tr>
+                <tr><td id="gSGSTLabel">SGST (50%)</td><td id="gSGSTColl">₹0</td><td id="gSGSTPaid">₹0</td><td id="gSGSTNet">₹0</td></tr>
                 <tr><td><strong>Total GST</strong></td><td id="gTotalColl">₹0</td><td id="gTotalPaid">₹0</td><td id="gTotalNet">₹0</td></tr>
               </tbody>
             </table>
@@ -500,50 +576,170 @@
 
     <!-- ═══════════ SETTINGS ═══════════ -->
     <div id="settingsPane" class="tab-pane">
-      <div class="page-header"><h2>Settings</h2><p>Business profile & preferences</p></div>
+      <div class="page-header"><h2>Settings</h2><p>Business profile, print templates &amp; data management</p></div>
+
       <div class="card">
+        <!-- Business Profile -->
         <div class="settings-section">
           <h3><i class="fas fa-building" style="margin-right:8px"></i>Business Profile</h3>
+          
           <div class="grid-2">
             <div class="form-group">
               <label class="form-label">Business Name</label>
               <input type="text" class="form-control" id="settBizName" placeholder="Your Business Name">
             </div>
             <div class="form-group">
-              <label class="form-label">GSTIN</label>
-              <input type="text" class="form-control" id="settGSTIN" placeholder="22AAAAA0000A1Z5">
+              <label class="form-label">Contact Phone</label>
+              <input type="text" class="form-control" id="settPhone" placeholder="+91 00000 00000">
             </div>
           </div>
           <div class="form-group">
             <label class="form-label">Business Address</label>
-            <textarea class="form-control" id="settBizAddr" placeholder="Full business address…"></textarea>
+            <textarea class="form-control" id="settBizAddr" placeholder="Full business address…" rows="2"></textarea>
           </div>
-          <div class="grid-2">
-            <div class="form-group">
-              <label class="form-label">Phone</label>
-              <input type="text" class="form-control" id="settPhone" placeholder="+91 00000 00000">
-            </div>
+          
+          <div class="grid-3">
             <div class="form-group">
               <label class="form-label">Email</label>
               <input type="email" class="form-control" id="settEmail" placeholder="business@email.com">
             </div>
+            <div class="form-group">
+              <label class="form-label">GSTIN</label>
+              <input type="text" class="form-control" id="settGSTIN" placeholder="22AAAAA0000A1Z5">
+            </div>
+            <div class="form-group">
+              <label class="form-label">PAN Number</label>
+              <input type="text" class="form-control" id="settPAN" placeholder="ABCDE1234F">
+            </div>
+          </div>
+
+          <h4 style="margin:16px 0 10px; color:var(--ink2); font-size:0.9rem"><i class="fas fa-university"></i> Bank & Payment Details</h4>
+          <div class="grid-3">
+            <div class="form-group"><label class="form-label">Bank Name</label><input type="text" class="form-control" id="settBankName" placeholder="e.g. HDFC Bank"></div>
+            <div class="form-group"><label class="form-label">Account No.</label><input type="text" class="form-control" id="settBankAcc" placeholder="50100..."></div>
+            <div class="form-group"><label class="form-label">IFSC Code</label><input type="text" class="form-control" id="settBankIFSC" placeholder="HDFC0001234"></div>
+          </div>
+          
+          <div class="form-group" style="margin-top:10px">
+            <label class="form-label">Invoice Terms & Conditions</label>
+            <textarea class="form-control" id="settTerms" placeholder="1. Goods once sold will not be taken back..." rows="2"></textarea>
           </div>
         </div>
+
+        <!-- Print Preferences -->
         <div class="settings-section">
-          <h3><i class="fas fa-sliders-h" style="margin-right:8px"></i>Inventory Preferences</h3>
+          <h3><i class="fas fa-print" style="margin-right:8px"></i>Print Templates</h3>
+          <p style="font-size:0.85rem;color:var(--ink3);margin-bottom:16px">Choose your default layout and paper size.</p>
+
+          <div class="form-group" style="margin-bottom:20px; max-width: 250px;">
+            <label class="form-label">Default Paper Size</label>
+            <select class="form-control" id="settPrintSize">
+              <option value="A4">A4 (Standard Full Page)</option>
+              <option value="A5">A5 (Half Page)</option>
+            </select>
+          </div>
+
+          <div class="template-style-group grid-2" id="templateList" style="margin-top:16px; align-items: stretch;">
+            
+            <div class="template-item active" id="opt-tpl-standard" style="flex-direction:column; align-items:flex-start; gap:16px;">
+              <div class="template-info" style="width:100%">
+                <div class="template-icon"><i class="fas fa-file-invoice"></i></div>
+                <div class="template-text">
+                  <strong>Standard Professional</strong>
+                  <span>A clean, traditional portrait layout</span>
+                </div>
+              </div>
+              <div class="template-actions" style="width:100%; justify-content:flex-end; border-top:1px solid var(--border); padding-top:12px;">
+                <button class="btn btn-secondary btn-sm" onclick="selectTemplate('tpl-standard')">Select Default</button>
+                <button class="btn btn-info btn-sm" onclick="showSamplePreview('tpl-standard')"><i class="fas fa-eye"></i> Preview</button>
+              </div>
+            </div>
+
+            <div class="template-item" id="opt-tpl-minimal" style="flex-direction:column; align-items:flex-start; gap:16px;">
+              <div class="template-info" style="width:100%">
+                <div class="template-icon" style="color:var(--ink2)"><i class="fas fa-align-left"></i></div>
+                <div class="template-text">
+                  <strong>Clean & Minimalist</strong>
+                  <span>Strips borders for a sleek, ink-saving design</span>
+                </div>
+              </div>
+              <div class="template-actions" style="width:100%; justify-content:flex-end; border-top:1px solid var(--border); padding-top:12px;">
+                <button class="btn btn-secondary btn-sm" onclick="selectTemplate('tpl-minimal')">Select Default</button>
+                <button class="btn btn-info btn-sm" onclick="showSamplePreview('tpl-minimal')"><i class="fas fa-eye"></i> Preview</button>
+              </div>
+            </div>
+
+            <div class="template-item" id="opt-tpl-bold" style="flex-direction:column; align-items:flex-start; gap:16px;">
+              <div class="template-info" style="width:100%">
+                <div class="template-icon" style="color:var(--danger)"><i class="fas fa-tint"></i></div>
+                <div class="template-text">
+                  <strong>Bold & Modern</strong>
+                  <span>Gradient headers and premium totals box</span>
+                </div>
+              </div>
+              <div class="template-actions" style="width:100%; justify-content:flex-end; border-top:1px solid var(--border); padding-top:12px;">
+                <button class="btn btn-secondary btn-sm" onclick="selectTemplate('tpl-bold')">Select Default</button>
+                <button class="btn btn-info btn-sm" onclick="showSamplePreview('tpl-bold')"><i class="fas fa-eye"></i> Preview</button>
+              </div>
+            </div>
+
+            <div class="template-item" id="opt-tpl-landscape" style="flex-direction:column; align-items:flex-start; gap:16px;">
+              <div class="template-info" style="width:100%">
+                <div class="template-icon" style="color:var(--gold)"><i class="fas fa-laptop"></i></div>
+                <div class="template-text">
+                  <strong>Wide Data (Landscape)</strong>
+                  <span>Flips horizontally for long descriptions</span>
+                </div>
+              </div>
+              <div class="template-actions" style="width:100%; justify-content:flex-end; border-top:1px solid var(--border); padding-top:12px;">
+                <button class="btn btn-secondary btn-sm" onclick="selectTemplate('tpl-landscape')">Select Default</button>
+                <button class="btn btn-info btn-sm" onclick="showSamplePreview('tpl-landscape')"><i class="fas fa-eye"></i> Preview</button>
+              </div>
+            </div>
+
+          </div>
+          <input type="hidden" id="settPrintTemplate" value="tpl-standard">
+        </div>
+
+        <!-- GST & Tax -->
+        <div class="settings-section">
+          <h3><i class="fas fa-percent" style="margin-right:8px"></i>Tax Preferences</h3>
+          <div class="form-group">
+            <label class="form-label">Supply Type (affects GST report)</label>
+            <select class="form-control" id="settSupplyType" style="max-width:280px">
+              <option value="intra">Intra-state — CGST + SGST</option>
+              <option value="inter">Inter-state — IGST only</option>
+            </select>
+          </div>
           <div class="form-group">
             <label class="form-label">Low Stock Threshold (units)</label>
-            <input type="number" class="form-control" id="settLowStockThresh" value="10" min="1" style="max-width:200px">
+            <input type="number" class="form-control" id="settLowStockThresh" value="10" min="1" style="max-width:160px">
           </div>
         </div>
+
+        <!-- Backup & Restore -->
+        <div class="settings-section">
+          <h3><i class="fas fa-database" style="margin-right:8px"></i>Data Backup &amp; Restore</h3>
+          <p style="font-size:0.85rem;color:var(--ink3);margin-bottom:16px">
+            Export all your invoices, purchases, customers, suppliers, products and settings to a JSON file. Import it anytime to restore your data.
+          </p>
+          <div class="flex-gap">
+            <button class="btn btn-primary btn-sm" id="backupExportBtn"><i class="fas fa-download"></i> Export Backup</button>
+            <label class="btn btn-secondary btn-sm" style="cursor:pointer">
+              <i class="fas fa-upload"></i> Import Backup
+              <input type="file" id="backupImportInput" accept=".json" style="display:none">
+            </label>
+          </div>
+        </div>
+
         <button class="btn btn-primary" onclick="saveSettings()"><i class="fas fa-save"></i> Save Settings</button>
       </div>
     </div>
 
   </main>
-</div>
+</div><!-- end layout -->
 
-<!-- Detail Modal -->
+<!-- ─── DETAIL MODAL ──────────────────────────── -->
 <div class="modal-overlay" id="detailModal">
   <div class="modal-box">
     <div class="modal-header">
@@ -554,9 +750,32 @@
   </div>
 </div>
 
-<!-- Keyboard shortcut hint -->
-<div id="kbHint" style="display:none;position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 16px;border-radius:var(--r-md);font-size:0.8rem;z-index:9998;font-weight:500"></div>
+<!-- Keyboard shortcut hint pill -->
+<div id="kbHint" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 16px;border-radius:var(--r-md);font-size:0.8rem;z-index:9998;font-weight:500;white-space:nowrap"></div>
 
-<script src="script.js"></script>
+<!-- Datalists for autocomplete -->
+<datalist id="customerList"></datalist>
+<datalist id="supplierList"></datalist>
+<datalist id="productList"></datalist>
+
+<div id="sampleModal" class="modal-overlay">
+  <div class="modal-box" style="width:900px; max-width:95vw; padding:0; display:flex; flex-direction:column; height:85vh; overflow:hidden;">
+    <div class="modal-header" style="padding:16px 24px; border-bottom:1px solid var(--border); margin:0; background:var(--surface2);">
+      <div class="modal-title"><i class="fas fa-eye" style="color:var(--info); margin-right:8px"></i> Template Live Preview</div>
+      <button class="modal-close" onclick="closeSampleModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="sampleContent" style="flex:1; background:#8f9ba8; display:flex; flex-direction:column;">
+      </div>
+  </div>
+</div>
+
+<!-- ─── SCRIPTS ────────────────────────────────── -->
+<script src="config.js"></script>
+<script src="inventory.js"></script>
+<script src="invoice.js"></script>
+<script src="purchase.js"></script>
+<script src="app.js"></script>
+
+
 </body>
 </html>
