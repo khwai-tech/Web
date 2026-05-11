@@ -655,17 +655,23 @@ function buildInvoiceHTML(templateName, isSample) {
   const taxLabel = (data.supplyType === "intra") ? "CGST + SGST" : "IGST";
   const priceModeLabel = (data.gstType === "Exclusive") ? "GST Exclusive" : "GST Inclusive";
 
-  // ─── DYNAMIC A4/A5 SCALING ───
-  const paperSize = bizProfile.printSize || 'A4';
-  const isA5 = paperSize === 'A5';
+ // ─── DYNAMIC SCALING & AUTO-FIT ───
+  const paperSize = bizProfile.printSize || 'auto';
+  const isA5 = paperSize === 'A5'; // Only used if they strictly force A5
+  
+  // Desktop preview widths
   const pWidth = isA5 ? '550px' : '800px';
   const lWidth = isA5 ? '750px' : '1050px';
   const pad = isA5 ? '20px' : '40px';
 
+  // If Auto, let the printer decide the size. Otherwise, force the exact paper format.
+  const pageRule = paperSize === 'auto' ? '@page { margin: 0.5cm; }' : `@page { size: ${paperSize}; margin: 0.5cm; }`;
+  const landscapePageRule = paperSize === 'auto' ? '@page { size: landscape; margin: 0.5cm; }' : `@page { size: ${paperSize} landscape; margin: 0.5cm; }`;
+
   let tplCSS = "";
   if (templateName === "tpl-minimal") {
     tplCSS = `
-      @page { size: ${paperSize}; margin: 0.5cm; }
+      ${pageRule}
       .invoice-paper { max-width:${pWidth}; margin:0 auto; background:white; padding:${pad}; border: 1px solid #eee; } 
       .inv-header { border-bottom: 1px solid #ddd !important; padding-bottom: 20px; }
       th { background: transparent !important; border-bottom: 2px solid #333 !important; color: #333 !important; }
@@ -674,7 +680,7 @@ function buildInvoiceHTML(templateName, isSample) {
     `;
   } else if (templateName === "tpl-bold") {
     tplCSS = `
-      @page { size: ${paperSize}; margin: 0.5cm; }
+      ${pageRule}
       .invoice-paper { max-width:${pWidth}; margin:0 auto; background:linear-gradient(to bottom, #ffffff, #fdf8f6); padding:${pad}; border-radius:16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-top: 8px solid #c2410c; } 
       .inv-header { border-bottom: none !important; }
       h1 { color: #c2410c !important; }
@@ -683,7 +689,7 @@ function buildInvoiceHTML(templateName, isSample) {
     `;
   } else if (templateName === "tpl-landscape") {
     tplCSS = `
-      @page { size: ${paperSize} landscape; margin: 0.5cm; }
+      ${landscapePageRule}
       .invoice-paper { max-width: ${lWidth}; margin:0 auto; background:white; padding:${pad}; border: 1px solid #ddd; border-top: 6px solid #1a4a3a; } 
       .inv-header { border-bottom:3px solid #1a4a3a !important; display: flex; align-items: center; }
       h1 { color: #1a4a3a !important; }
@@ -691,13 +697,21 @@ function buildInvoiceHTML(templateName, isSample) {
     `;
   } else {
     tplCSS = `
-      @page { size: ${paperSize}; margin: 0.5cm; }
+      ${pageRule}
       .invoice-paper { max-width:${pWidth}; margin:0 auto; background:white; padding:${pad}; border:1px solid #eee; border-top: 6px solid #1e4a6e; } 
       .inv-header { border-bottom: 3px solid #1e4a6e !important; }
       h1 { color: #1e4a6e !important; }
       th { background: #f1f5f9 !important; color: #1e4a6e !important; }
     `;
   }
+
+  // Force width to 100% when printing so the browser handles the fitting
+  const printCSS = `
+    @media print { 
+      body { background:white; padding:0; font-size: ${isA5 ? '0.85rem' : '12pt'}; } 
+      .invoice-paper { width: 100% !important; max-width: 100% !important; box-shadow:none !important; border:none !important; padding:0 !important; margin:0 !important; } 
+    }
+  `;
 
   return `<!DOCTYPE html>
   <html>
