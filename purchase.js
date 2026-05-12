@@ -130,34 +130,40 @@ function savePurchase() {
     App.editingPurchaseId = null;
   }
 
-  // auto-learn new products — fix: stock starts at qty purchased, not negative
-  purLineItems.forEach(it => {
-    const existing = inventoryStock.find(p => p.name.toLowerCase() === it.desc.toLowerCase());
-    if (existing) {
-      existing.stock = (existing.stock || 0) + it.qty; // update stock on existing product
-    } else {
-      inventoryStock.push({
-        id: 'P-' + Date.now().toString().slice(-5),
-        name: it.desc,
-        costPrice: it.cost,
-        sellPrice: it.cost * 1.5,
-        gstRate: it.gstRate,
-        stock: it.qty   // fix: was -it.qty before
-      });
-    }
-  });
-
   // auto-learn new supplier — fix: case-insensitive match
   const supplierName = document.getElementById('supplierName').value.trim();
   if (!suppliersArray.find(s => s.name.toLowerCase() === supplierName.toLowerCase())) {
     suppliersArray.push({ id: 'SUPP-' + Date.now().toString().slice(-5), name: supplierName, phone: '', address: '', paymentTerms: '' });
   }
-  updateDatalists();
+  
+  if (typeof updateDatalists === 'function') updateDatalists();
+  if (typeof renderInventoryTable === 'function') renderInventoryTable();
+
+  // 👇 NEW FINISHING SEQUENCE 👇
+  const finish = (local) => {
+    purchasesArray.unshift({ ...payload, timestamp: new Date().toISOString() });
+    localStorage.setItem("bs_purchases", JSON.stringify(purchasesArray));
+    
+    if (typeof renderPurchaseLists === 'function') renderPurchaseLists();
+    if (typeof updateDashboard === 'function') updateDashboard();
+    
+    toast(`Purchase ${poId} saved${local ? ' locally' : ''}!`, 'success');
+    
+    App.isSaving = false;
+    const saveBtn = document.getElementById('savePurchaseBtn');
+    if (saveBtn) { 
+      saveBtn.disabled = false; 
+      saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Purchase'; 
+    }
+    
+    // Automatically reset the form and tabs after saving
+    if (typeof clearPurchaseForm === 'function') clearPurchaseForm(true);
+  };
 
   toast(`Sending PO ${poId}…`, 'warn');
   fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) })
-    .then(() => commitPurchase(payload))
-    .catch(() => commitPurchase(payload));
+    .then(() => finish(false))
+    .catch(() => finish(true));
 }
 
 function commitPurchase(payload) {
@@ -202,7 +208,7 @@ function clearPurchaseForm(force = false) {
     tabNew.click();
   }
   
-  toast('Form cleared', 'warn');
+  if (!force) toast('Form cleared', 'warn');
 }
 
 // ─── RENDER PURCHASE LISTS ────────────────────
@@ -316,7 +322,7 @@ function duplicatePurchase(id) {
   const tabNew = document.querySelector('.sec-tab[data-stab="purchaseNew"]');
   if (tabNew) tabNew.click();
 
-  toast(`Loaded ${id} as a copy. You can now edit items before saving.`, 'info');
+  toast(`Loaded ${id} as a copy. You can now edit items before saving.`, 'success');
 }
 
 function deletePurchase(id) {
@@ -385,7 +391,7 @@ function loadEditPurchase(id) {
   const tabNew = document.querySelector('.sec-tab[data-stab="purchaseNew"]');
   if (tabNew) tabNew.click(); 
 
-  toast(`Editing ${id}. Stock will recalculate when saved.`, 'info');
+  toast(`Editing ${id}. Stock will recalculate when saved.`, 'success');
 }
 
 function buildPurchaseHTML(templateName, isSample, purData = null) {
