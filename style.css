@@ -572,14 +572,3 @@ select.form-control { appearance:none; background-image:url("data:image/svg+xml,
 .tpl-option.selected { border-color:var(--accent); background:var(--accent-light); }
 .tpl-option-label { font-size:0.75rem; font-weight:600; color:var(--ink2); text-align:center; }
 .tpl-option.selected .tpl-option-label { color:var(--accent); }
-
-/* ─── TEMPLATE SWITCHER CARDS ────────────────── */
-.template-style-group { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
-.template-item { display: flex; align-items: center; justify-content: space-between; padding: 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-md); transition: 0.2s; flex-wrap: wrap; gap: 12px; }
-.template-item.active { border-color: var(--accent2); background: var(--accent-light); box-shadow: var(--shadow); }
-.template-item.active .btn-secondary { background: var(--accent); color: white; border-color: var(--accent); }
-.template-info { display: flex; align-items: center; gap: 14px; flex: 1; }
-.template-icon { width: 44px; height: 44px; border-radius: var(--r-sm); background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; color: var(--accent); box-shadow: var(--shadow); }
-.template-text strong { display: block; font-size: 0.95rem; color: var(--ink); margin-bottom: 2px; }
-.template-text span { font-size: 0.75rem; color: var(--ink3); }
-.template-actions { display: flex; gap: 8px; }
