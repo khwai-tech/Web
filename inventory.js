@@ -419,17 +419,31 @@ function renderCustomerGrid() {
     grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><i class="fas fa-users"></i><p>No customers yet</p></div>';
     return;
   }
+  // fix: build invoice summary in ONE pass — was double-traversing for count + total
+  const invSummary = {};
+  invoicesArray.forEach(i => {
+    const key = (i.customerName || '').toLowerCase();
+    if (!invSummary[key]) invSummary[key] = { count: 0, total: 0 };
+    invSummary[key].count++;
+    invSummary[key].total += (i.grandTotal || 0);
+  });
   grid.innerHTML = filtered.map(c => {
-    // fix: case-insensitive invoice count
-    const invCount = invoicesArray.filter(i => i.customerName.toLowerCase() === c.name.toLowerCase()).length;
-    const total    = invoicesArray.filter(i => i.customerName.toLowerCase() === c.name.toLowerCase()).reduce((s, i) => s + (i.grandTotal || 0), 0);
-    return `<div class="customer-card" onclick="openCustomerLedger('${esc(c.id)}')">
-      <div class="customer-name"><i class="fas fa-user-circle" style="color:var(--accent2);margin-right:6px"></i>${esc(c.name)}</div>
+    const summ = invSummary[(c.name||'').toLowerCase()] || { count: 0, total: 0 };
+    return `<div class="customer-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div class="customer-name" style="cursor:pointer" onclick="openCustomerLedger('${esc(c.id)}')">
+          <i class="fas fa-user-circle" style="color:var(--accent2);margin-right:6px"></i>${esc(c.name)}
+        </div>
+        <button class="btn-icon info" style="width:28px;height:28px;font-size:0.75rem;flex-shrink:0" onclick="openEditCustomer('${esc(c.id)}')" title="Edit customer">
+          <i class="fas fa-pen"></i>
+        </button>
+      </div>
       ${c.email   ? `<div class="customer-detail"><i class="fas fa-envelope" style="margin-right:4px"></i>${esc(c.email)}</div>`          : ''}
-      ${c.address ? `<div class="customer-detail"><i class="fas fa-map-marker-alt" style="margin-right:4px"></i>${esc(c.address)}</div>` : ''}
-      <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:0.78rem;color:var(--accent2);font-weight:600">${invCount} invoice${invCount !== 1 ? 's' : ''}</span>
-        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9rem;color:var(--accent)">${fmt(total)}</span>
+      ${c.phone   ? `<div class="customer-detail"><i class="fas fa-phone" style="margin-right:4px"></i>${esc(c.phone)}</div>`             : ''}
+      ${c.address ? `<div class="customer-detail"><i class="fas fa-map-marker-alt" style="margin-right:4px"></i>${esc(c.address)}</div>`  : ''}
+      <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="openCustomerLedger('${esc(c.id)}')">
+        <span style="font-size:0.78rem;color:var(--accent2);font-weight:600">${summ.count} invoice${summ.count!==1?'s':''}</span>
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9rem;color:var(--accent)">${fmt(summ.total)}</span>
       </div>
     </div>`;
   }).join('');
@@ -451,21 +465,92 @@ function openAddCustomer() {
 function addCustomerLocal() {
   const name = document.getElementById('ncName').value.trim();
   if (!name) { toast('Enter a name', 'error'); return; }
-  const c = { id: 'CUST-' + Date.now().toString().slice(-6), name, email: document.getElementById('ncEmail').value.trim(), phone: document.getElementById('ncPhone').value.trim(), address: document.getElementById('ncAddr').value.trim() };
+  
+  const c = { 
+    id: 'CUST-' + Date.now().toString().slice(-6), 
+    name, 
+    email: document.getElementById('ncEmail').value.trim(), 
+    phone: document.getElementById('ncPhone').value.trim(), 
+    address: document.getElementById('ncAddr').value.trim() 
+  };
+  
   customersArray.push(c);
   updateDatalists();
   closeModal();
   renderCustomerGrid();
-  toast(`${name} added`, 'success');
+  
+  toast(`Syncing ${name} to database...`, 'warn');
+  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "saveCustomer", ...c }) })
+    .then(() => toast('Customer saved permanently!', 'success'));
+}
+
+// ─── EDIT CUSTOMER ────────────────────────────
+function openEditCustomer(id) {
+  // FIX: Added String() wrapper to ensure numbers and text match perfectly
+  const c = customersArray.find(x => String(x.id) === String(id));
+  if (!c) return;
+  document.getElementById('modalTitle').textContent = 'Edit Customer';
+  document.getElementById('modalBody').innerHTML = `
+    <div class="form-group"><label class="form-label">Name</label><input type="text" class="form-control" id="ecName" value="${esc(c.name)}"></div>
+    <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-control" id="ecEmail" value="${esc(c.email||'')}"></div>
+    <div class="form-group"><label class="form-label">Phone</label><input type="text" class="form-control" id="ecPhone" value="${esc(c.phone||'')}"></div>
+    <div class="form-group"><label class="form-label">Address</label><textarea class="form-control" id="ecAddr">${esc(c.address||'')}</textarea></div>
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="saveEditCustomer('${esc(id)}')"><i class="fas fa-save"></i> Save Changes</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteCustomer('${esc(id)}')"><i class="fas fa-trash"></i> Delete</button>
+    </div>`;
+  document.getElementById('detailModal').classList.add('open');
+}
+
+function saveEditCustomer(id) {
+  const c = customersArray.find(x => String(x.id) === String(id));
+  if (!c) return;
+  const name = document.getElementById('ecName').value.trim();
+  if (!name) { toast('Name cannot be empty', 'error'); return; }
+  const oldName = c.name;
+  
+  c.name    = name;
+  c.email   = document.getElementById('ecEmail').value.trim();
+  c.phone   = document.getElementById('ecPhone').value.trim();
+  c.address = document.getElementById('ecAddr').value.trim();
+
+  if (oldName.toLowerCase() !== name.toLowerCase()) {
+    invoicesArray.forEach(i => { if (i.customerName.toLowerCase() === oldName.toLowerCase()) i.customerName = name; });
+    localStorage.setItem('bs_invoices', JSON.stringify(invoicesArray));
+  }
+  
+  updateDatalists();
+  closeModal();
+  renderCustomerGrid();
+  
+  toast('Syncing changes to database...', 'warn');
+  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "editCustomer", ...c }) })
+    .then(() => toast(`${name} updated successfully`, 'success'));
+}
+
+function deleteCustomer(id) {
+  const idx = customersArray.findIndex(x => String(x.id) === String(id));
+  if (idx === -1) return;
+  if (!confirm(`Delete ${customersArray[idx].name}? Their invoice history will remain.`)) return;
+  
+  const [removed] = customersArray.splice(idx, 1);
+  updateDatalists();
+  closeModal();
+  renderCustomerGrid();
+  
+  toast('Deleting from database...', 'warn');
+  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "deleteCustomer", id: String(id) }) })
+    .then(() => toast(`${removed.name} deleted permanently`, 'success'));
 }
 
 // Customer ledger view
 function openCustomerLedger(id) {
-  const c = customersArray.find(x => x.id === id);
+  const c = customersArray.find(x => String(x.id) === String(id));
   if (!c) return;
   const invs = invoicesArray.filter(i => i.customerName.toLowerCase() === c.name.toLowerCase());
   const total = invs.reduce((s, i) => s + (i.grandTotal || 0), 0);
   const outstanding = invs.filter(i => i.status === 'unpaid' || i.status === 'overdue').reduce((s, i) => s + (i.grandTotal || 0), 0);
+  
   document.getElementById('modalTitle').textContent = 'Customer Ledger — ' + c.name;
   document.getElementById('modalBody').innerHTML = `
     <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">
@@ -495,17 +580,31 @@ function renderSupplierGrid() {
     grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><i class="fas fa-building"></i><p>No suppliers yet</p></div>';
     return;
   }
+  // fix: build purchase summary in ONE pass — was double-traversing for count + total
+  const purSummary = {};
+  purchasesArray.forEach(p => {
+    const key = (p.supplier || '').toLowerCase();
+    if (!purSummary[key]) purSummary[key] = { count: 0, total: 0 };
+    purSummary[key].count++;
+    purSummary[key].total += (p.totalAmount || 0);
+  });
   grid.innerHTML = filtered.map(s => {
-    const purCount = purchasesArray.filter(p => p.supplier.toLowerCase() === s.name.toLowerCase()).length;
-    const total    = purchasesArray.filter(p => p.supplier.toLowerCase() === s.name.toLowerCase()).reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+    const summ = purSummary[(s.name||'').toLowerCase()] || { count: 0, total: 0 };
     return `<div class="customer-card">
-      <div class="customer-name"><i class="fas fa-building" style="color:var(--accent2);margin-right:6px"></i>${esc(s.name)}</div>
-      ${s.phone        ? `<div class="customer-detail"><i class="fas fa-phone" style="margin-right:4px"></i>${esc(s.phone)}</div>` : ''}
-      ${s.address      ? `<div class="customer-detail"><i class="fas fa-map-marker-alt" style="margin-right:4px"></i>${esc(s.address)}</div>` : ''}
-      ${s.paymentTerms ? `<div class="customer-detail"><i class="fas fa-clock" style="margin-right:4px"></i>${esc(s.paymentTerms)}</div>` : ''}
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div class="customer-name">
+          <i class="fas fa-building" style="color:var(--accent2);margin-right:6px"></i>${esc(s.name)}
+        </div>
+        <button class="btn-icon info" style="width:28px;height:28px;font-size:0.75rem;flex-shrink:0" onclick="openEditSupplier('${esc(s.id)}')" title="Edit supplier">
+          <i class="fas fa-pen"></i>
+        </button>
+      </div>
+      ${s.phone        ? `<div class="customer-detail"><i class="fas fa-phone" style="margin-right:4px"></i>${esc(s.phone)}</div>`             : ''}
+      ${s.address      ? `<div class="customer-detail"><i class="fas fa-map-marker-alt" style="margin-right:4px"></i>${esc(s.address)}</div>`   : ''}
+      ${s.paymentTerms ? `<div class="customer-detail"><i class="fas fa-clock" style="margin-right:4px"></i>${esc(s.paymentTerms)}</div>`        : ''}
       <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:0.78rem;color:var(--info);font-weight:600">${purCount} purchase${purCount !== 1 ? 's' : ''}</span>
-        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9rem;color:var(--gold)">${fmt(total)}</span>
+        <span style="font-size:0.78rem;color:var(--info);font-weight:600">${summ.count} purchase${summ.count!==1?'s':''}</span>
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9rem;color:var(--gold)">${fmt(summ.total)}</span>
       </div>
     </div>`;
   }).join('');
@@ -527,11 +626,81 @@ function openAddSupplier() {
 function addSupplierLocal() {
   const name = document.getElementById('nsName').value.trim();
   if (!name) { toast('Enter a supplier name', 'error'); return; }
-  suppliersArray.push({ id: 'SUPP-' + Date.now().toString().slice(-6), name, phone: document.getElementById('nsPhone').value.trim(), address: document.getElementById('nsAddr').value.trim(), paymentTerms: document.getElementById('nsPay').value.trim() });
+  
+  const s = { 
+    id: 'SUPP-' + Date.now().toString().slice(-6), 
+    name, 
+    phone: document.getElementById('nsPhone').value.trim(), 
+    address: document.getElementById('nsAddr').value.trim(), 
+    paymentTerms: document.getElementById('nsPay').value.trim() 
+  };
+  
+  suppliersArray.push(s);
   updateDatalists();
   closeModal();
   renderSupplierGrid();
-  toast(`${name} added`, 'success');
+  
+  toast(`Syncing ${name} to database...`, 'warn');
+  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "saveSupplier", ...s }) })
+    .then(() => toast('Supplier saved permanently!', 'success'));
+}
+
+// ─── EDIT SUPPLIER ────────────────────────────
+function openEditSupplier(id) {
+  const s = suppliersArray.find(x => x.id === id);
+  if (!s) return;
+  document.getElementById('modalTitle').textContent = 'Edit Supplier';
+  document.getElementById('modalBody').innerHTML = `
+    <div class="form-group"><label class="form-label">Supplier Name</label><input type="text" class="form-control" id="esName" value="${esc(s.name)}"></div>
+    <div class="form-group"><label class="form-label">Phone</label><input type="text" class="form-control" id="esPhone" value="${esc(s.phone||'')}"></div>
+    <div class="form-group"><label class="form-label">Address</label><textarea class="form-control" id="esAddr">${esc(s.address||'')}</textarea></div>
+    <div class="form-group"><label class="form-label">Payment Terms</label><input type="text" class="form-control" id="esPay" value="${esc(s.paymentTerms||'')}"></div>
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="saveEditSupplier('${esc(id)}')"><i class="fas fa-save"></i> Save Changes</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteSupplier('${esc(id)}')"><i class="fas fa-trash"></i> Delete</button>
+    </div>`;
+  document.getElementById('detailModal').classList.add('open');
+}
+
+function saveEditSupplier(id) {
+  const s = suppliersArray.find(x => x.id === id);
+  if (!s) return;
+  const name = document.getElementById('esName').value.trim();
+  if (!name) { toast('Name cannot be empty', 'error'); return; }
+  const oldName = s.name;
+  
+  s.name         = name;
+  s.phone        = document.getElementById('esPhone').value.trim();
+  s.address      = document.getElementById('esAddr').value.trim();
+  s.paymentTerms = document.getElementById('esPay').value.trim();
+
+  if (oldName.toLowerCase() !== name.toLowerCase()) {
+    purchasesArray.forEach(p => { if ((p.supplier||'').toLowerCase() === oldName.toLowerCase()) p.supplier = name; });
+    localStorage.setItem('bs_purchases', JSON.stringify(purchasesArray));
+  }
+  
+  updateDatalists();
+  closeModal();
+  renderSupplierGrid();
+  
+  toast(`Syncing changes to database...`, 'warn');
+  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "editSupplier", ...s }) })
+    .then(() => toast(`${name} updated successfully`, 'success'));
+}
+
+function deleteSupplier(id) {
+  const idx = suppliersArray.findIndex(x => x.id === id);
+  if (idx === -1) return;
+  if (!confirm(`Delete ${suppliersArray[idx].name}? Their purchase history will remain.`)) return;
+  
+  const [removed] = suppliersArray.splice(idx, 1);
+  updateDatalists();
+  closeModal();
+  renderSupplierGrid();
+  
+  toast(`Deleting from database...`, 'warn');
+  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "deleteSupplier", id: id }) })
+    .then(() => toast(`${removed.name} deleted permanently`, 'success'));
 }
 
 // ─── DATALISTS ────────────────────────────────
