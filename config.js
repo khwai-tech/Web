@@ -41,10 +41,124 @@ let chartPie         = App.chartPie;
 let reportRange      = App.reportRange;
 
 // ─── SETTINGS ─────────────────────────────────
-let bizProfile = {
-  name: 'BillingSuite Pro', gstin: '', address: '', phone: '', email: '',
-  logo: '', printTemplate: 'tpl-standard', supplyType: 'intra'
+let bizProfile = JSON.parse(localStorage.getItem('bs_settings')) || {
+  name: '', gstin: '', address: '', phone: '', email: '',
+  pan: '', bankName: '', bankAcc: '', bankIFSC: '', state: '',
+  terms: '1. Goods once sold will not be taken back.\n2. Subject to local jurisdiction.',
+  logo: '', printTemplate: 'tpl-standard', supplyType: 'intra', printSize: 'auto',
+  // 👇 Default variables for the new tabs
+  invPrefix: 'INV-', payTerms: 'Due on Receipt',
+  poPrefix: 'PO-', deliveryLoc: '', defaultMargin: 50
 };
+
+// ─── SETTINGS LOAD / SAVE ─────────────────────
+function loadSettings() {
+  // Sync the latest saved settings from memory
+  const s = localStorage.getItem('bs_settings');
+  if (s) bizProfile = { ...bizProfile, ...JSON.parse(s) };
+
+  // Safe helper to prevent crashes if an HTML element is missing
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+
+  // Business Tab
+  setVal('settBizName', bizProfile.name || '');
+  setVal('settGSTIN', bizProfile.gstin || '');
+  setVal('settBizAddr', bizProfile.address || '');
+  setVal('state-list',  bizProfile.state || '');
+  setVal('settPhone',   bizProfile.phone || '');
+  setVal('settEmail',   bizProfile.email || '');
+  setVal('settPAN',     bizProfile.pan || '');
+  setVal('settBankName',bizProfile.bankName || '');
+  setVal('settBankAcc', bizProfile.bankAcc || '');
+  setVal('settBankIFSC',bizProfile.bankIFSC || '');
+  
+  // Invoice & Purchase Tabs 
+  setVal('settTerms',       bizProfile.terms || '');
+  setVal('settInvPrefix',   bizProfile.invPrefix || 'INV-');
+  setVal('settPayTerms',    bizProfile.payTerms || 'Due on Receipt');
+  setVal('settPoPrefix',    bizProfile.poPrefix || 'PO-');
+  setVal('settDeliveryLoc', bizProfile.deliveryLoc || '');
+  
+  // Product Tab
+  setVal('settDefaultMargin', bizProfile.defaultMargin || 50);
+
+  // Dropdowns (Template, Size, Tax)
+  const tplSel = document.getElementById('settPrintTemplate');
+  if (tplSel) { 
+    tplSel.value = bizProfile.printTemplate || 'tpl-standard'; 
+    if (typeof selectTemplate === 'function') selectTemplate(tplSel.value, true);
+  }
+  const sizeSel = document.getElementById('settPrintSize');
+  if (sizeSel) sizeSel.value = bizProfile.printSize || 'auto';
+  const supSel = document.getElementById('settSupplyType');
+  if (supSel) supSel.value = bizProfile.supplyType || 'intra';
+  
+  // Low Stock Threshold
+  const thresh = localStorage.getItem('bs_thresh');
+  if (thresh) { 
+    LOW_STOCK_THRESHOLD = parseInt(thresh); 
+    setVal('settLowStockThresh', LOW_STOCK_THRESHOLD);
+  }
+  
+  if (typeof updatePrintHeaders === 'function') updatePrintHeaders();
+}
+
+// ─── SAVE SETTINGS & BUSINESS PROFILE ────────────────────
+function saveSettings() {
+  // 1. Collect all data from the Settings form
+  bizProfile.name       = document.getElementById('settBizName')?.value.trim()  || '';
+  bizProfile.gstin      = document.getElementById('settGSTIN')?.value.trim() || '';
+  bizProfile.address    = document.getElementById('settBizAddr')?.value.trim() || '';
+  bizProfile.state      = document.getElementById('state-list')?.value || '';
+  bizProfile.phone      = document.getElementById('settPhone')?.value.trim() || '';
+  bizProfile.email      = document.getElementById('settEmail')?.value.trim() || '';
+  bizProfile.pan        = document.getElementById('settPAN')?.value.trim() || '';
+  bizProfile.bankName   = document.getElementById('settBankName')?.value.trim() || '';
+  bizProfile.bankAcc    = document.getElementById('settBankAcc')?.value.trim() || '';
+  bizProfile.bankIFSC   = document.getElementById('settBankIFSC')?.value.trim() || '';
+  
+  bizProfile.terms        = document.getElementById('settTerms')?.value.trim() || '';
+  bizProfile.invPrefix    = document.getElementById('settInvPrefix')?.value.trim() || 'INV-';
+  bizProfile.payTerms     = document.getElementById('settPayTerms')?.value.trim() || '';
+  bizProfile.poPrefix     = document.getElementById('settPoPrefix')?.value.trim() || 'PO-';
+  bizProfile.deliveryLoc  = document.getElementById('settDeliveryLoc')?.value.trim() || '';
+  bizProfile.defaultMargin = parseInt(document.getElementById('settDefaultMargin')?.value) || 50;
+
+  const tplSel = document.getElementById('settPrintTemplate');
+  if (tplSel) bizProfile.printTemplate = tplSel.value;
+  const supSel = document.getElementById('settSupplyType');
+  const sizeSel = document.getElementById('settPrintSize');
+  if (sizeSel) bizProfile.printSize = sizeSel.value;
+  if (supSel) bizProfile.supplyType = supSel.value;
+  
+  LOW_STOCK_THRESHOLD = parseInt(document.getElementById('settLowStockThresh')?.value) || 10;
+  
+  // 2. Save instantly to local browser storage
+  localStorage.setItem('bs_settings', JSON.stringify(bizProfile));
+  localStorage.setItem('bs_thresh', LOW_STOCK_THRESHOLD);
+  
+  if (typeof updatePrintHeaders === 'function') updatePrintHeaders();
+  
+  toast('Syncing settings to database...', 'warn');
+  
+  // 3. Send payload to Google Apps Script Backend
+  const payload = {
+    action: "saveSettings",
+    settings: bizProfile
+  };
+
+  fetch(API_URL, { 
+    method: "POST", 
+    mode: "no-cors", 
+    headers: { "Content-Type": "text/plain;charset=utf-8" }, 
+    body: JSON.stringify(payload) 
+  }).then(() => {
+    toast('Business profile saved permanently!', 'success');
+  }).catch(err => {
+    console.error(err);
+    toast('Saved locally, but offline.', 'error');
+  });
+}
 
 // ─── SHARED GST HELPER (fix: single source of truth — was copy-pasted 6x) ──
 function calcGST(base, gstRate, gstType) {
@@ -54,6 +168,27 @@ function calcGST(base, gstRate, gstType) {
   } else {
     const gst = base * gstRate;
     return { gst, subtotalPart: base, total: base + gst };
+  }
+}
+
+// ─── SMART GST ENGINE ─────────────────────────────────
+function getSmartSupplyType(customerGstin) {
+  // 1. Get your business state code from the Settings tab
+  const myStateCode = document.getElementById('state-list')?.value;
+  
+  // 2. If customer has no GSTIN, or it's too short -> Intra-state (CGST+SGST)
+  if (!customerGstin || customerGstin.trim().length < 2) {
+    return 'intra'; 
+  }
+  
+  // 3. Extract the first 2 characters of the customer's GSTIN
+  const custStateCode = customerGstin.trim().substring(0, 2);
+  
+  // 4. Compare and decide
+  if (myStateCode && custStateCode === myStateCode) {
+    return 'intra'; // Same state -> CGST + SGST
+  } else {
+    return 'inter'; // Different state -> IGST
   }
 }
 
@@ -100,74 +235,6 @@ function updateTemplatePreview() {
   const [title, desc] = map[tpl] || ['Custom', ''];
   if (descTitle) descTitle.textContent = title;
   if (descText)  descText.textContent  = desc;
-}
-
-// ─── SETTINGS LOAD / SAVE ─────────────────────
-function loadSettings() {
-  const s = localStorage.getItem('bs_settings');
-  if (s) bizProfile = { ...bizProfile, ...JSON.parse(s) };
-  
-  // Safe helper to prevent crashes if an HTML element is accidentally missing
-  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-
-  setVal('settBizName', bizProfile.name || '');
-  setVal('settGSTIN', bizProfile.gstin || '');
-  setVal('settBizAddr', bizProfile.address || '');
-  setVal('settPhone', bizProfile.phone || '');
-  setVal('settEmail', bizProfile.email || '');
-  setVal('settPAN', bizProfile.pan || '');
-  setVal('settBankName', bizProfile.bankName || '');
-  setVal('settBankAcc', bizProfile.bankAcc || '');
-  setVal('settBankIFSC', bizProfile.bankIFSC || '');
-  setVal('settTerms', bizProfile.terms || '');
-
-  const tplSel = document.getElementById('settPrintTemplate');
-  if (tplSel) { 
-    tplSel.value = bizProfile.printTemplate || 'tpl-standard'; 
-    if (typeof selectTemplate === 'function') selectTemplate(tplSel.value);
-  }
-
-  const sizeSel = document.getElementById('settPrintSize');
-  if (sizeSel) sizeSel.value = bizProfile.printSize || 'A4';
-  
-  const supSel = document.getElementById('settSupplyType');
-  if (supSel) supSel.value = bizProfile.supplyType || 'intra';
-  
-  if (bizProfile.logo) {
-    const prev = document.getElementById('logoPreview');
-    if (prev) { prev.src = bizProfile.logo; prev.style.display = 'block'; }
-  }
-  
-  const thresh = localStorage.getItem('bs_thresh');
-  if (thresh) { 
-    LOW_STOCK_THRESHOLD = parseInt(thresh); 
-    setVal('settLowStockThresh', LOW_STOCK_THRESHOLD);
-  }
-  
-  updatePrintHeaders();
-}
-function saveSettings() {
-  bizProfile.name       = document.getElementById('settBizName').value.trim()  || 'BillingSuite Pro';
-  bizProfile.gstin      = document.getElementById('settGSTIN').value.trim();
-  bizProfile.address    = document.getElementById('settBizAddr').value.trim();
-  bizProfile.phone      = document.getElementById('settPhone').value.trim();
-  bizProfile.email      = document.getElementById('settEmail').value.trim();
-  bizProfile.pan      = document.getElementById('settPAN').value.trim();
-  bizProfile.bankName = document.getElementById('settBankName').value.trim();
-  bizProfile.bankAcc  = document.getElementById('settBankAcc').value.trim();
-  bizProfile.bankIFSC = document.getElementById('settBankIFSC').value.trim();
-  bizProfile.terms    = document.getElementById('settTerms').value.trim();
-  const tplSel = document.getElementById('settPrintTemplate');
-  if (tplSel) bizProfile.printTemplate = tplSel.value;
-  const supSel = document.getElementById('settSupplyType');
-  const sizeSel = document.getElementById('settPrintSize');
-  if (sizeSel) bizProfile.printSize = sizeSel.value;
-  if (supSel) bizProfile.supplyType = supSel.value;
-  LOW_STOCK_THRESHOLD = parseInt(document.getElementById('settLowStockThresh').value) || 10;
-  localStorage.setItem('bs_settings', JSON.stringify(bizProfile));
-  localStorage.setItem('bs_thresh', LOW_STOCK_THRESHOLD);
-  updatePrintHeaders();
-  toast('Settings saved!', 'success');
 }
 
 function updatePrintHeaders() {
@@ -242,23 +309,32 @@ function dateLabel(d) {
   catch(e) { return d; }
 }
 
-// fix: safely calculates the highest ID in the entire array regardless of sort order
-function getNextId(array, prefix) {
-  if (!array || !array.length) return `${prefix}-2026-001`;
+// ─── UTILITIES ─────────────────────────────────
+
+// Safely calculates highest ID using custom prefixes from Settings
+function getNextId(array, fallbackPrefix) {
+  // Grab custom prefix from settings, or use fallback
+  const customPrefix = fallbackPrefix === 'INV' 
+    ? (typeof bizProfile !== 'undefined' && bizProfile.invPrefix ? bizProfile.invPrefix : 'INV-') 
+    : (typeof bizProfile !== 'undefined' && bizProfile.poPrefix ? bizProfile.poPrefix : 'PO-');
+  
+  if (!array || !array.length) return `${customPrefix}001`;
   
   let maxNum = 0;
   
   array.forEach(item => {
     const id = item.invoiceId || item.poNumber || '';
-    const parts = id.split('-');
-    const num = parseInt(parts[parts.length - 1], 10);
-    
-    if (!isNaN(num) && num > maxNum) {
-      maxNum = num;
+    // This safely extracts the numbers at the end of the string, ignoring the letters
+    const match = id.match(/(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNum) {
+        maxNum = num;
+      }
     }
   });
   
-  return `${prefix}-2026-${String(maxNum + 1).padStart(3, '0')}`;
+  return `${customPrefix}${String(maxNum + 1).padStart(3, '0')}`;
 }
 
 // fix: check for duplicate invoice ID before saving
@@ -331,4 +407,62 @@ function selectTemplate(tplId) {
   localStorage.setItem('bs_settings', JSON.stringify(bizProfile)); 
   
   toast('Default template saved!', 'success');
+}
+
+// ─── IMAGE UPLOAD LOGIC (Upgraded with Preview & Delete) ───
+
+function processImageUpload(inputElement, keyName) {
+  const file = inputElement.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(event) {
+    const base64String = event.target.result;
+    
+    // 1. Save to memory
+    bizProfile[keyName] = base64String;
+    localStorage.setItem("bs_profile", JSON.stringify(bizProfile));
+    
+    // 2. Instantly show the preview UI
+    showImagePreview(keyName, base64String);
+    
+    toast(`${keyName === 'logo' ? 'Logo' : 'Signature'} saved successfully!`, 'success');
+  };
+  
+  reader.readAsDataURL(file); 
+}
+
+// Helper: Displays the preview box
+function showImagePreview(keyName, srcString) {
+  const isLogo = keyName === 'logo';
+  const imgEl = document.getElementById(isLogo ? 'logoPreviewImg' : 'sigPreviewImg');
+  const containerEl = document.getElementById(isLogo ? 'logoPreviewContainer' : 'sigPreviewContainer');
+  
+  if (imgEl && containerEl && srcString) {
+    imgEl.src = srcString;
+    containerEl.style.display = 'block';
+  }
+}
+
+// Helper: Deletes the image from memory and hides the preview
+function removeImage(keyName) {
+  // 1. Wipe it from memory
+  bizProfile[keyName] = '';
+  localStorage.setItem("bs_profile", JSON.stringify(bizProfile));
+  
+  // 2. Hide the preview box
+  const isLogo = keyName === 'logo';
+  const containerEl = document.getElementById(isLogo ? 'logoPreviewContainer' : 'sigPreviewContainer');
+  const inputEl = document.getElementById(isLogo ? 'logoInput' : 'sigInput');
+  
+  if (containerEl) containerEl.style.display = 'none';
+  if (inputEl) inputEl.value = ''; // Clears the file input text
+  
+  toast(`${keyName === 'logo' ? 'Logo' : 'Signature'} removed.`, 'warn');
+}
+
+// ─── INITIALIZE PREVIEWS ON PAGE LOAD ───
+function loadSettingsPreviews() {
+  if (bizProfile.logo) showImagePreview('logo', bizProfile.logo);
+  if (bizProfile.signature) showImagePreview('signature', bizProfile.signature);
 }
