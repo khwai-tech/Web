@@ -51,7 +51,7 @@
     </div>
 
     <div class="nav-section">Main</div>
-    <button class="nav-item active" data-tab="dashboard"><i class="fas fa-chart-pie"></i> Dashboard</button>
+    <button class="nav-item" data-tab="dashboard"><i class="fas fa-chart-pie"></i> Dashboard</button>
     <button class="nav-item" data-tab="invoice"><i class="fas fa-file-invoice-dollar"></i> Invoice</button>
     <button class="nav-item" data-tab="purchase"><i class="fas fa-truck"></i> Purchase</button>
 
@@ -86,15 +86,15 @@
   <main class="main">
 
     <!-- ═══════════ DASHBOARD ═══════════ -->
-    <div id="dashboardPane" class="tab-pane active">
+    <div id="dashboardPane" class="tab-pane">
       <div class="page-header">
         <h2>Dashboard</h2>
         <p id="dashDate">Today, loading…</p>
       </div>
 
       <div class="quick-actions no-print">
-        <button class="qa-btn" onclick="switchTab('invoice')"><i class="fas fa-plus-circle"></i> New Invoice</button>
-        <button class="qa-btn" onclick="switchTab('purchase')"><i class="fas fa-cart-plus"></i> New Purchase</button>
+        <button class="qa-btn" onclick="switchTab('invoice'); setTimeout(openNewInvoiceForm, 50);"><i class="fas fa-plus-circle"></i> Create New Invoice</button>
+        <button class="qa-btn" onclick="switchTab('purchase'); setTimeout(openNewPurchaseForm, 50);"><i class="fas fa-cart-plus"></i> Create New Purchase</button>
         <button class="qa-btn" onclick="openAddProduct()"><i class="fas fa-tag"></i> Add Product</button>
         <button class="qa-btn" onclick="openAddCustomer()"><i class="fas fa-user-plus"></i> Add Customer</button>
         <button class="qa-btn" onclick="openAddSupplier()"><i class="fas fa-user-plus"></i> Add Supplier</button>
@@ -156,28 +156,38 @@
 
     <!-- ═══════════ INVOICE ═══════════ -->
     <div id="invoicePane" class="tab-pane">
+      
       <div class="page-header flex-between">
-        <div><h2>Invoice</h2><p>Create and manage customer invoices</p></div>
-        <div class="flex-gap no-print">
+        <div><h2>Invoices</h2><p>Manage your billing and customer invoices</p></div>
+        <div class="flex-gap no-print" id="invoiceHeaderActions">
           <button class="btn btn-secondary btn-sm" id="refreshInvoiceHistoryBtn"><i class="fas fa-sync-alt"></i> Sync</button>
-          <button class="btn btn-info btn-sm" onclick="printCurrentInvoice()"><i class="fas fa-print"></i> Print</button>
-          <button class="btn btn-secondary btn-sm" onclick="exportInvoiceCSV()"><i class="fas fa-file-csv"></i> CSV</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportInvoiceCSV()"><i class="fas fa-download"></i> CSV</button>
+          <button class="btn btn-primary" onclick="openNewInvoiceForm()"><i class="fas fa-plus"></i> Create Invoice</button>
         </div>
       </div>
 
-      <div class="secondary-tabs no-print">
-        <button class="sec-tab active" id="tabNewInvoice" data-stab="invoiceNew">New Invoice</button>
-        <button class="sec-tab" id="tabEditInvoice" data-stab="invoiceNew" style="display:none; color:var(--gold); border-bottom-color:var(--gold)">Edit Invoice</button>
-        <button class="sec-tab" data-stab="invoiceRecent">Recent</button>
-        <button class="sec-tab" data-stab="invoiceHistory">History</button>
+      <div class="secondary-tabs no-print" id="invoiceTabsBar">        
+        <button class="sec-tab active" data-stab="invoiceHistory"><i class="fas fa-archive"></i> Invoice History</button>
+       
+        
+        <button class="sec-tab" id="tabNewInvoice" data-stab="invoiceNew" style="display:none; color:var(--accent); border-bottom-color:var(--accent)"><i class="fas fa-plus-circle"></i> New Invoice</button>
+        <button class="sec-tab" id="tabEditInvoice" data-stab="invoiceNew" style="display:none; color:var(--gold); border-bottom-color:var(--gold)"><i class="fas fa-edit"></i> Edit Invoice</button>
       </div>
 
       <!-- NEW INVOICE -->
-      <div id="invoiceNew" class="stab-pane">
+      <div id="invoiceNew" class="stab-pane" style="display:none">
         <div class="grid-2">
           <div class="card" id="invoicePrintArea">
             
-            <div class="card-title" id="invoiceFormTitle"><i class="fas fa-plus-circle"></i> New Invoice</div>
+            <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:12px;">
+            <span id="invoiceFormTitle"><i class="fas fa-plus-circle"></i> New Invoice</span>
+            
+            <div style="display:flex; gap:16px; font-size:1.3rem;">
+              <i class="fas fa-print" title="Save & Print" style="cursor:pointer; color:var(--info); transition:0.2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--info)'" onclick="processInvoice('print')"></i>
+              
+              <i class="fas fa-times" title="Close / Cancel" style="cursor:pointer; color:var(--danger); transition:0.2s;" onmouseover="this.style.color='#a93226'" onmouseout="this.style.color='var(--danger)'" onclick="cancelInvoice()"></i>
+            </div>
+          </div>
 
             <div class="grid-2">
               <div class="form-group">
@@ -189,7 +199,7 @@
                 <input type="date" class="form-control" id="invDate">
               </div>
             </div>
-            <div class="grid-2">
+            <div class="grid-3">
               <div class="form-group">
                 <label class="form-label">Customer Name</label>
                 <input type="text" class="form-control" id="customerName" placeholder="Search or type name" list="customerList">
@@ -197,6 +207,10 @@
               <div class="form-group">
                 <label class="form-label">Customer Email</label>
                 <input type="email" class="form-control" id="customerEmail" placeholder="client@email.com">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Customer GSTIN</label>
+                <input type="text" class="form-control" id="customerGstin" placeholder="GSTIN" style="text-transform:uppercase">
               </div>
             </div>
             <div class="form-group">
@@ -228,7 +242,8 @@
               <table class="items-table">
                 <thead>
                   <tr>
-                    <th style="width:40%; min-width:240px">Product / Description</th>
+                    <th style="width:35%; min-width:200px">Product / Description</th>
+                    <th style="width:15%">HSN/SAC</th>
                     <th style="width:65px">Qty</th>
                     <th style="width:100px">Unit Price</th>
                     <th style="width:86px" class="no-print">GST %</th>
@@ -261,11 +276,12 @@
               <div class="totals-row grand"><span>Grand Total</span><span id="grandTotalVal">₹0.00</span></div>
             </div>
 
-            <div class="flex-gap no-print" style="margin-top:20px">
-              <button class="btn btn-primary" id="saveInvoiceBtn"><i class="fas fa-save"></i> Save Invoice</button>
-              <button class="btn btn-secondary" id="clearInvoiceFormBtn"><i class="fas fa-times"></i> Clear</button>
-              <button class="btn btn-gold btn-sm" onclick="printCurrentInvoice()"><i class="fas fa-print"></i> Print</button>
-            </div>
+            <div style="display:flex; gap:12px; margin-top:24px; padding-top:16px; border-top:1px solid var(--border); flex-wrap:wrap;">
+            <button class="btn btn-danger" onclick="cancelInvoice()" style="background:var(--danger); border-color:var(--danger); color:#fff"><i class="fas fa-exclamation-triangle"></i> Cancel</button>
+            <div style="flex-grow:1"></div> <button class="btn btn-secondary" onclick="processInvoice('save')"><i class="fas fa-save"></i> Save</button>
+            <button class="btn btn-info" onclick="processInvoice('print')"><i class="fas fa-print"></i> Save & Print</button>
+            <button class="btn btn-primary" onclick="processInvoice('close')"><i class="fas fa-check-double"></i> Save & Close</button>
+          </div>
 
             <div class="print-footer">
               Thank you for your business! · Generated by BillingSuite Pro
@@ -299,12 +315,30 @@
       </div>
 
       <!-- HISTORY sub-tab -->
-      <div id="invoiceHistory" class="stab-pane" style="display:none">
+      <div id="invoiceHistory" class="stab-pane" >
         <div class="card">
           <div class="card-title flex-between" style="margin-bottom:14px">
             <span><i class="fas fa-archive"></i> Invoice History</span>
-            <button class="btn btn-secondary btn-sm" onclick="exportInvoiceCSV()"><i class="fas fa-download"></i> Export CSV</button>
+            <div class="flex-gap">
+              <select class="form-control" id="invoiceSortSelect" onchange="filterInvoices()" style="width:150px; padding:6px 10px; font-size:0.8rem">
+                <option value="date-desc">Newest First</option>
+                <option value="date-asc">Oldest First</option>
+                <option value="amt-desc">Highest Amount</option>
+                <option value="amt-asc">Lowest Amount</option>
+              </select>
+              <button class="btn btn-secondary btn-sm" onclick="exportInvoiceCSV()"><i class="fas fa-download"></i> CSV</button>
+            </div>
           </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+            <span style="font-size:0.75rem;font-weight:600;color:var(--ink3);align-self:center">Status:</span>
+            <button class="filter-chip active" onclick="setInvFilter('all',this)">All</button>
+            <button class="filter-chip" onclick="setInvFilter('paid',this)">Paid</button>
+            <button class="filter-chip" onclick="setInvFilter('unpaid',this)">Unpaid</button>
+            <button class="filter-chip" onclick="setInvFilter('overdue',this)">Overdue</button>
+            <button class="filter-chip" onclick="setInvFilter('draft',this)">Draft</button>
+            <input type="hidden" id="invActiveFilter" value="all">
+          </div>
+
           <div class="search-wrap">
             <i class="fas fa-search"></i>
             <input type="text" class="search-input" id="invoiceSearch" placeholder="Search by ID, customer, email…" oninput="filterInvoices()">
@@ -316,25 +350,35 @@
 
     <!-- ═══════════ PURCHASE ═══════════ -->
     <div id="purchasePane" class="tab-pane">
+      
       <div class="page-header flex-between">
-        <div><h2>Purchase</h2><p>Record supplier purchases &amp; update stock</p></div>
+        <div><h2>Purchases</h2><p>Record supplier purchases &amp; update stock</p></div>
         <div class="flex-gap no-print">
           <button class="btn btn-secondary btn-sm" id="refreshPurchaseHistoryBtn"><i class="fas fa-sync-alt"></i> Sync</button>
-          <button class="btn btn-info btn-sm" onclick="printCurrentPurchase()"><i class="fas fa-print"></i> Print PO</button>
+          <button class="btn btn-primary" onclick="openNewPurchaseForm()"><i class="fas fa-plus"></i> Create Purchase</button>
         </div>
       </div>
 
-      <div class="secondary-tabs no-print">
-        <button class="sec-tab active" id="tabNewPurchase" data-stab="purchaseNew">New Purchase</button>
-        <button class="sec-tab" id="tabEditPurchase" data-stab="purchaseNew" style="display:none; color:var(--gold); border-bottom-color:var(--gold)">Edit Purchase</button>
-        <button class="sec-tab" data-stab="purchaseHistory">History</button>
+      <div class="secondary-tabs no-print" id="purchaseTabsBar">
+        <button class="sec-tab active" data-stab="purchaseHistory"><i class="fas fa-archive"></i> Purchase History</button>
+        
+        <button class="sec-tab" id="tabNewPurchase" data-stab="purchaseNew" style="display:none; color:var(--accent); border-bottom-color:var(--accent)"><i class="fas fa-plus-circle"></i> New Purchase</button>
+        <button class="sec-tab" id="tabEditPurchase" data-stab="purchaseNew" style="display:none; color:var(--gold); border-bottom-color:var(--gold)"><i class="fas fa-edit"></i> Edit Purchase</button>
       </div>
 
-      <div id="purchaseNew" class="stab-pane">
+      <div id="purchaseNew" class="stab-pane" style="display:none">
         <div class="grid-2">
           <div class="card" id="purchasePrintArea">
             
-            <div class="card-title"><i class="fas fa-cart-plus"></i> New Purchase Order</div>
+            <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:12px;">
+            <span id="purchaseFormTitle"><i class="fas fa-plus-circle"></i> New Purchase</span>
+            
+            <div style="display:flex; gap:16px; font-size:1.3rem;">
+              <i class="fas fa-print" title="Save & Print" style="cursor:pointer; color:var(--info); transition:0.2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--info)'" onclick="processPurchase('print')"></i>
+              
+              <i class="fas fa-times" title="Close / Cancel" style="cursor:pointer; color:var(--danger); transition:0.2s;" onmouseover="this.style.color='#a93226'" onmouseout="this.style.color='var(--danger)'" onclick="cancelPurchase()"></i>
+            </div>
+          </div>
 
             <div class="grid-2">
               <div class="form-group">
@@ -366,7 +410,8 @@
               <table class="items-table">
                 <thead>
                   <tr>
-                    <th style="width:40%; min-width:240px">Product / Description</th>
+                    <th style="width:35%; min-width:200px">Product / Description</th>
+                    <th style="width:15%">HSN/SAC</th>
                     <th style="width:65px">Qty</th>
                     <th style="width:100px">Unit Cost</th>
                     <th style="width:86px" class="no-print">GST %</th>
@@ -388,11 +433,13 @@
               <div class="totals-row grand"><span>Total Purchase</span><span id="purchaseTotalSpan">₹0.00</span></div>
             </div>
 
-            <div class="flex-gap no-print" style="margin-top:20px">
-              <button class="btn btn-primary" id="savePurchaseBtn"><i class="fas fa-save"></i> Save Purchase</button>
-              <button class="btn btn-secondary" onclick="clearPurchaseForm()"><i class="fas fa-times"></i> Clear</button>
-              <button class="btn btn-gold btn-sm" onclick="printCurrentPurchase()"><i class="fas fa-print"></i> Print PO</button>
-            </div>
+            <div style="display:flex; gap:12px; margin-top:24px; padding-top:16px; border-top:1px solid var(--border); flex-wrap:wrap;">
+            <button class="btn btn-danger" onclick="cancelPurchase()" style="background:var(--danger); border-color:var(--danger); color:#fff"><i class="fas fa-exclamation-triangle"></i> Cancel</button>
+            <div style="flex-grow:1"></div>
+            <button class="btn btn-secondary" onclick="processPurchase('save')"><i class="fas fa-save"></i> Save</button>
+            <button class="btn btn-info" onclick="processPurchase('print')"><i class="fas fa-print"></i> Save & Print</button>
+            <button class="btn btn-primary" onclick="processPurchase('close')"><i class="fas fa-check-double"></i> Save & Close</button>
+          </div>
 
             <div class="print-footer">Thank you for your order! · Generated by BillingSuite Pro</div>
           </div><!-- end purchasePrintArea -->
@@ -407,14 +454,25 @@
         </div>
       </div><!-- end purchaseNew -->
 
-      <div id="purchaseHistory" class="stab-pane" style="display:none">
+      <div id="purchaseHistory" class="stab-pane">
         <div class="card">
           <div class="card-title flex-between" style="margin-bottom:14px">
             <span><i class="fas fa-history"></i> Purchase History</span>
           </div>
-          <div class="search-wrap">
-            <i class="fas fa-search"></i>
-            <input type="text" class="search-input" id="purchaseSearch" placeholder="Search by PO number or supplier…" oninput="filterPurchases()">
+          <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center;">
+            <div style="flex:1; min-width:220px; position:relative;">
+              <i class="fas fa-search" style="position:absolute; left:12px; top:10px; color:var(--ink2);"></i>
+              <input type="text" id="purchaseSearch" class="form-control" placeholder="Search PO, Supplier, or Amount..." oninput="filterPurchases()" style="padding-left:36px;">
+            </div>
+            
+            <div style="width:180px;">
+              <select id="purchaseSortSelect" class="form-control" onchange="filterPurchases()">
+                <option value="date-desc">Newest First</option>
+                <option value="date-asc">Oldest First</option>
+                <option value="amt-desc">Amount: High to Low</option>
+                <option value="amt-asc">Amount: Low to High</option>
+              </select>
+            </div>
           </div>
           <div id="purchaseHistoryList"><div class="empty-state"><i class="fas fa-truck"></i><p>No purchases saved yet</p></div></div>
         </div>
@@ -483,9 +541,14 @@
       </div>
       <div class="card">
         <div class="card-title"><i class="fas fa-tag"></i> Product Catalog</div>
-        <div class="search-wrap">
-          <i class="fas fa-search"></i>
-          <input type="text" class="search-input" id="productSearch" placeholder="Search products…" oninput="filterProducts()">
+        <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+          <div class="search-wrap" style="flex:1; margin-bottom:0; min-width:200px;">
+            <i class="fas fa-search"></i>
+            <input type="text" class="search-input" id="productSearch" placeholder="Search products…" oninput="filterProducts()">
+          </div>
+          <select class="form-control" id="productCategoryFilter" onchange="filterProducts()" style="width:200px;">
+            <option value="all">All Categories</option>
+          </select>
         </div>
         <div class="product-grid" id="productGrid">
           <div class="empty-state" style="grid-column:1/-1"><i class="fas fa-tags"></i><p>No products yet — add one or sync from Sheets</p></div>
@@ -616,12 +679,26 @@
 
     <!-- ═══════════ SETTINGS ═══════════ -->
     <div id="settingsPane" class="tab-pane">
-      <div class="page-header"><h2>Settings</h2><p>Business profile, print templates &amp; data management</p></div>
+      
+      <div class="page-header flex-between">
+        <div><h2>Settings</h2><p>Configure your application preferences</p></div>
+        <div class="flex-gap no-print">
+          <button class="btn btn-primary" onclick="saveSettings()"><i class="fas fa-save"></i> Save Settings</button>
+        </div>
+      </div>
 
-      <div class="card">
-        <!-- Business Profile -->
-        <div class="settings-section">
-          <h3><i class="fas fa-building" style="margin-right:8px"></i>Business Profile</h3>
+      <div class="secondary-tabs no-print" id="settingsTabsBar">
+        <button class="sec-tab active" data-stab="settingsBusiness"><i class="fas fa-building"></i> Business Details</button>
+        <button class="sec-tab" data-stab="settingsInvoice"><i class="fas fa-file-invoice"></i> Invoice</button>
+        <button class="sec-tab" data-stab="settingsPurchase"><i class="fas fa-shopping-cart"></i> Purchase</button>
+        <button class="sec-tab" data-stab="settingsProduct"><i class="fas fa-box"></i> Product</button>
+        <button class="sec-tab" data-stab="settingsPrint"><i class="fas fa-print"></i> Print</button>
+        <button class="sec-tab" data-stab="settingsTax"><i class="fas fa-percent"></i> Tax</button>
+        <button class="sec-tab" data-stab="settingsBackup"><i class="fas fa-database"></i> Backup</button>
+      </div>
+
+      <div id="settingsBusiness" class="stab-pane">
+        <h3><i class="fas fa-building" style="margin-right:8px"></i>Business Profile</h3>
           
           <div class="grid-2">
             <div class="form-group">
@@ -633,10 +710,18 @@
               <input type="text" class="form-control" id="settPhone" placeholder="+91 00000 00000">
             </div>
           </div>
+
+          
           <div class="form-group">
             <label class="form-label">Business Address</label>
             <textarea class="form-control" id="settBizAddr" placeholder="Full business address…" rows="2"></textarea>
           </div>
+
+          <div class="form-group">
+              <label class="form-label">State</label>
+              <select class="form-control" id="state-list">
+                <option value="">--Select State--</option> </select>
+            </div>
           
           <div class="grid-3">
             <div class="form-group">
@@ -653,21 +738,86 @@
             </div>
           </div>
 
+          <div class="grid-4">
+          <div class="form-group" style="margin-top:12px;">
+            <label class="form-label">Company Logo</label>
+            <input type="file" accept="image/*" onchange="processImageUpload(this, 'logo')" class="form-control" style="padding:4px;">
+          </div>
+          
+          <div class="form-group" style="margin-top:12px;">
+            <label class="form-label">Authorised Signature</label>
+            <input type="file" accept="image/*" onchange="processImageUpload(this, 'signature')" class="form-control" style="padding:4px;">
+          </div>
+        </div>
+
+        <div class="grid-5">          
+          <div id="logoPreviewContainer" style="display:none; margin-top:12px; position:relative; width:max-content;">
+            <img id="logoPreviewImg" src="" style="max-height:80px; border:1px dashed var(--border); border-radius:6px; padding:4px; background:white;">
+            <button onclick="removeImage('logo')" title="Remove Logo" style="position:absolute; top:-8px; right:-12px; background:var(--danger); color:white; border:none; border-radius:50%; width:24px; height:24px; cursor:pointer; font-size:12px; box-shadow:0 2px 5px rgba(0,0,0,0.2); transition:0.2s;"><i class="fas fa-times"></i></button>
+          </div>
+                    
+          <div id="sigPreviewContainer" style="display:none; margin-top:12px; position:relative; width:max-content;">
+            <img id="sigPreviewImg" src="" style="max-height:60px; border:1px dashed var(--border); border-radius:6px; padding:4px; background:white;">
+            <button onclick="removeImage('signature')" title="Remove Signature" style="position:absolute; top:-8px; right:-12px; background:var(--danger); color:white; border:none; border-radius:50%; width:24px; height:24px; cursor:pointer; font-size:12px; box-shadow:0 2px 5px rgba(0,0,0,0.2); transition:0.2s;"><i class="fas fa-times"></i></button>
+          </div>
+        </div>
+
           <h4 style="margin:16px 0 10px; color:var(--ink2); font-size:0.9rem"><i class="fas fa-university"></i> Bank & Payment Details</h4>
           <div class="grid-3">
             <div class="form-group"><label class="form-label">Bank Name</label><input type="text" class="form-control" id="settBankName" placeholder="e.g. HDFC Bank"></div>
             <div class="form-group"><label class="form-label">Account No.</label><input type="text" class="form-control" id="settBankAcc" placeholder="50100..."></div>
             <div class="form-group"><label class="form-label">IFSC Code</label><input type="text" class="form-control" id="settBankIFSC" placeholder="HDFC0001234"></div>
-          </div>
+          </div>          
           
-          <div class="form-group" style="margin-top:10px">
-            <label class="form-label">Invoice Terms & Conditions</label>
-            <textarea class="form-control" id="settTerms" placeholder="1. Goods once sold will not be taken back..." rows="2"></textarea>
+      </div>
+
+      <div id="settingsInvoice" class="stab-pane" style="display:none">
+        <div class="card">
+          <div class="card-title"><i class="fas fa-file-invoice"></i> Invoice Preferences</div>
+          <div class="grid-2">
+            <div class="form-group"><label class="form-label">Invoice Prefix</label>
+              <input type="text" class="form-control" id="settInvPrefix" value="INV-">
+            </div>
+            <div class="form-group"><label class="form-label">Default Payment Terms</label>
+              <input type="text" class="form-control" id="settPayTerms" value="Due on Receipt">
+            </div>
+            <div class="form-group" style="grid-column: span 2;"><label class="form-label">Default Terms & Conditions</label>
+              <textarea class="form-control" id="settTerms">1. Goods once sold will not be taken back.&#10;2. Subject to local jurisdiction.</textarea>
+            </div>
           </div>
         </div>
+      </div>
 
-        <!-- Print Preferences -->
-        <div class="settings-section">
+      <div id="settingsPurchase" class="stab-pane" style="display:none">
+        <div class="card">
+          <div class="card-title"><i class="fas fa-shopping-cart"></i> Purchase Order Preferences</div>
+          <div class="grid-2">
+            <div class="form-group"><label class="form-label">PO Prefix</label>
+              <input type="text" class="form-control" id="settPoPrefix" value="PO-">
+            </div>
+            <div class="form-group"><label class="form-label">Default Delivery Location</label>
+              <input type="text" class="form-control" id="settDeliveryLoc">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="settingsProduct" class="stab-pane" style="display:none">
+        <div class="card">
+          <div class="card-title"><i class="fas fa-box"></i> Inventory & Products</div>
+          <div class="grid-2">
+            <div class="form-group"><label class="form-label">Low Stock Warning Threshold</label>
+              <input type="number" class="form-control" id="settLowStockThresh" value="10" min="1">
+            </div>
+            <div class="form-group"><label class="form-label">Default Margin (%)</label>
+              <input type="number" class="form-control" id="settDefaultMargin" value="50">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="settingsPrint" class="stab-pane" style="display:none">
+        <div class="card">
           <h3><i class="fas fa-print" style="margin-right:8px"></i>Print Templates</h3>
           <p style="font-size:0.85rem;color:var(--ink3);margin-bottom:16px">Choose your default layout and paper size.</p>
 
@@ -741,9 +891,10 @@
           </div>
           <input type="hidden" id="settPrintTemplate" value="tpl-standard">
         </div>
+      </div>
 
-        <!-- GST & Tax -->
-        <div class="settings-section">
+      <div id="settingsTax" class="stab-pane" style="display:none">
+        <div class="card">
           <h3><i class="fas fa-percent" style="margin-right:8px"></i>Tax Preferences</h3>
           <div class="form-group">
             <label class="form-label">Supply Type (affects GST report)</label>
@@ -752,14 +903,11 @@
               <option value="inter">Inter-state — IGST only</option>
             </select>
           </div>
-          <div class="form-group">
-            <label class="form-label">Low Stock Threshold (units)</label>
-            <input type="number" class="form-control" id="settLowStockThresh" value="10" min="1" style="max-width:160px">
-          </div>
         </div>
+      </div>
 
-        <!-- Backup & Restore -->
-        <div class="settings-section">
+      <div id="settingsBackup" class="stab-pane" style="display:none">
+        <div class="card">
           <h3><i class="fas fa-database" style="margin-right:8px"></i>Data Backup &amp; Restore</h3>
           <p style="font-size:0.85rem;color:var(--ink3);margin-bottom:16px">
             Export all your invoices, purchases, customers, suppliers, products and settings to a JSON file. Import it anytime to restore your data.
@@ -772,9 +920,8 @@
             </label>
           </div>
         </div>
-
-        <button class="btn btn-primary" onclick="saveSettings()"><i class="fas fa-save"></i> Save Settings</button>
       </div>
+
     </div>
 
   </main>
