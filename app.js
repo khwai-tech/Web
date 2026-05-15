@@ -15,19 +15,58 @@ function initTabs() {
   });
 }
 
+// ─── GST STATE CODES ─────────────────────────────────────
+const GST_STATE_CODES = {
+  "01": "Jammu and Kashmir", "02": "Himachal Pradesh", "03": "Punjab", "04": "Chandigarh",
+  "05": "Uttarakhand", "06": "Haryana", "07": "Delhi", "08": "Rajasthan", "09": "Uttar Pradesh",
+  "10": "Bihar", "11": "Sikkim", "12": "Arunachal Pradesh", "13": "Nagaland", "14": "Manipur",
+  "15": "Mizoram", "16": "Tripura", "17": "Meghalaya", "18": "Assam", "19": "West Bengal",
+  "20": "Jharkhand", "21": "Odisha", "22": "Chhattisgarh", "23": "Madhya Pradesh", "24": "Gujarat",
+  "26": "Dadra and Nagar Haveli and Daman and Diu", "27": "Maharashtra", "28": "Andhra Pradesh",
+  "29": "Karnataka", "30": "Goa", "31": "Lakshadweep", "32": "Kerala", "33": "Tamil Nadu",
+  "34": "Puducherry", "35": "Andaman and Nicobar Islands", "36": "Telangana", "38": "Ladakh"
+};
+
+function buildStateDropdown() {
+  const select = document.getElementById("state-list");
+  if (!select) return;
+
+  // 1. Wipe it clean so we don't accidentally duplicate the list
+  select.innerHTML = '<option value="">--Select State--</option>';
+
+  // 2. Build the list of states
+  Object.entries(GST_STATE_CODES).sort((a, b) => a[1].localeCompare(b[1])).forEach(([code, name]) => {
+      let option = document.createElement("option");
+      option.value = code;
+      option.text = `${name} (${code})`; // Added the GST code to the text for better UI!
+      select.appendChild(option);
+  });
+
+  // ⚡ 3. CRITICAL FIX: Force it to select your saved state right NOW
+  if (typeof bizProfile !== 'undefined' && bizProfile.state) {
+      select.value = bizProfile.state;
+  }
+}
+
 function switchTab(tab) {
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   const btn = document.querySelector(`.nav-item[data-tab="${tab}"]`);
   if (btn) btn.classList.add('active');
+  
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   const pane = document.getElementById(tab + 'Pane');
   if (pane) pane.classList.add('active');
+  
   if (tab === 'inventory') refreshInventory();
   if (tab === 'products')  renderProductGrid();
   if (tab === 'report')    buildReports();
   if (tab === 'customers') renderCustomerGrid();
   if (tab === 'suppliers') renderSupplierGrid();
+  
   document.getElementById('sidebar').classList.remove('open');
+  
+  // 👇 FIX: Changed tabId to tab
+  localStorage.setItem('bs_active_tab', tab); 
 }
 
 // ─── DATE SETUP ───────────────────────────────
@@ -329,26 +368,59 @@ function initSupplierAutoFill() {
   });
 }
 
+// ─── AUTO-FILLS ───────────────────────────────
 function initCustomerAutoFill() {
   const custInput = document.getElementById('customerName');
-  if (!custInput) return;
-  custInput.addEventListener('change', () => {
-    const name  = custInput.value.trim();
-    const match = customersArray.find(c => c.name.toLowerCase() === name.toLowerCase());
-    if (match) {
-      const emailEl = document.getElementById('customerEmail');
-      const addrEl  = document.getElementById('billingAddr');
-      if (emailEl && match.email)   emailEl.value = match.email;
-      if (addrEl  && match.address) addrEl.value  = match.address;
-      toast(`Loaded details for ${esc(match.name)}`, 'success');
-    }
-  });
+  const gstinInput = document.getElementById('customerGstin');
+
+  // 1. Auto-fill when selecting a saved customer
+  if (custInput) {
+    custInput.addEventListener('change', () => {
+      const name  = custInput.value.trim();
+      const match = customersArray.find(c => c.name.toLowerCase() === name.toLowerCase());
+      if (match) {
+        const emailEl = document.getElementById('customerEmail');
+        const addrEl  = document.getElementById('billingAddr');
+        if (emailEl && match.email)   emailEl.value = match.email;
+        if (addrEl  && match.address) addrEl.value  = match.address;
+        if (gstinInput && match.gstin) gstinInput.value = match.gstin;
+
+        // ⚡ FIRE THE TAX ENGINE ⚡
+        App.currentInvoiceSupplyType = getSmartSupplyType(match.gstin);
+        if (typeof calcInvoiceTotals === 'function') calcInvoiceTotals();
+        
+        toast(`Loaded details for ${esc(match.name)}`, 'success');
+      }
+    });
+  }
+
+  // 2. Auto-switch tax if user manually types/changes the GSTIN
+  if (gstinInput) {
+    gstinInput.addEventListener('change', () => {
+      App.currentInvoiceSupplyType = getSmartSupplyType(gstinInput.value);
+      if (typeof calcInvoiceTotals === 'function') calcInvoiceTotals();
+      
+      const typeLabel = App.currentInvoiceSupplyType === 'inter' ? 'IGST' : 'CGST & SGST';
+      toast(`Tax switched to ${typeLabel}`, 'info');
+    });
+  }
 }
 
 // ─── INIT ─────────────────────────────────────
 function init() {
+  const lastTab = localStorage.getItem('bs_active_tab') || 'dashboard';
+  
+  try {
+    switchTab(lastTab);
+  } catch (err) {}
+
   loadTheme();
   setupDates();
+  loadSettingsPreviews();
+
+  // 👇 ADD THIS LINE: Build the dropdown and apply the saved state
+  if (typeof buildStateDropdown === 'function') buildStateDropdown();
+
   loadSettings();
 
     invoicesArray.length  = 0; invoicesArray.push(...JSON.parse(localStorage.getItem('bs_invoices')  || '[]'));
@@ -392,6 +464,8 @@ function init() {
 
 document.addEventListener('DOMContentLoaded', init);
 
+
+
 // ─── FETCH CONTACTS FROM DATABASE ────────────────────────────
 function fetchDatabaseContacts() {
   toast('Loading customers & suppliers...', 'info');
@@ -413,7 +487,8 @@ function fetchDatabaseContacts() {
               name: row[1] || '',
               email: row[2] || '',
               phone: row[3] || '',
-              address: row[4] || ''
+              address: row[4] || '',
+              gstin: row[5] || ''
             });
           }
         });
@@ -431,7 +506,8 @@ function fetchDatabaseContacts() {
               name: row[1] || '',
               phone: row[2] || '',
               address: row[3] || '',
-              paymentTerms: row[4] || ''
+              paymentTerms: row[4] || '',
+              gstin: row[5] || ''
             });
           }
         });
@@ -448,5 +524,30 @@ function fetchDatabaseContacts() {
       console.error("Database Sync Error:", err);
       toast('Failed to fetch from database. Using local data.', 'error');
     });
+}
+
+// ─── NUMBER TO WORDS CONVERTER (Indian System) ────────────
+function numberToWords(num) {
+  if (num === 0) return "Zero";
+  const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const b = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  
+  function inWords(n) {
+    let str = "";
+    if (n > 9999999) { str += inWords(Math.floor(n / 10000000)) + " Crore "; n %= 10000000; }
+    if (n > 99999)   { str += inWords(Math.floor(n / 100000)) + " Lakh "; n %= 100000; }
+    if (n > 999)     { str += inWords(Math.floor(n / 1000)) + " Thousand "; n %= 1000; }
+    if (n > 99)      { str += a[Math.floor(n / 100)] + " Hundred "; n %= 100; }
+    if (n > 0) {
+      if (str !== "") str += "and ";
+      if (n < 20) str += a[n];
+      else {
+        str += b[Math.floor(n / 10)];
+        if (n % 10 > 0) str += " " + a[n % 10];
+      }
+    }
+    return str;
+  }
+  return inWords(Math.round(num)).trim();
 }
 
