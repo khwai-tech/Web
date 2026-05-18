@@ -29,7 +29,7 @@
 }
 
 * { margin:0; padding:0; box-sizing:border-box; }
-body { background:var(--bg); font-family:'DM Sans',sans-serif; color:var(--ink); min-height:100vh; transition:background 0.3s,color 0.3s; }
+body { background:var(--bg); font-family:'DM Sans',sans-serif; color:var(--ink); min-height:100vh; }
 
 /* ─── LAYOUT ──────────────────────────────────── */
 .layout { display:flex; min-height:100vh; }
@@ -217,11 +217,37 @@ select.form-control { appearance:none; background-image:url("data:image/svg+xml,
 .gst-summary-table td { padding:12px 14px; border-bottom:1px solid var(--border); }
 .gst-summary-table tr:last-child td { border-bottom:none; font-weight:700; background:var(--surface2); }
 
-/* ─── CUSTOMER / SUPPLIER CARDS ───────────────── */
-.customer-card { background:var(--surface2); border:1px solid var(--border); border-radius:var(--r-lg); padding:16px; display:flex; flex-direction:column; gap:6px; transition:0.15s; cursor:pointer; }
-.customer-card:hover { border-color:var(--accent2); box-shadow:var(--shadow); }
-.customer-name   { font-weight:700; font-size:0.95rem; }
-.customer-detail { font-size:0.78rem; color:var(--ink3); }
+/* ─── CONTACT LAYOUT ENGINE (Customers & Suppliers) ─── */
+.contact-layout { transition: all 0.3s ease; }
+.contact-layout.view-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.contact-layout.view-list { display: flex; flex-direction: column; gap: 8px; }
+
+.contact-layout .customer-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; transition: 0.15s; }
+.contact-layout .customer-card:hover { border-color: var(--accent2); box-shadow: var(--shadow); }
+
+/* List View Overrides */
+.contact-layout.view-list .customer-card { flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 18px; }
+.contact-layout.view-list .card-body-left { flex: 1; display: flex; align-items: center; gap: 24px; }
+.contact-layout.view-list .card-body-right { flex: unset; border-top: none; padding-top: 0; display: flex; align-items: center; gap: 24px; text-align: right; }
+.contact-layout.view-list .customer-detail { margin-top: 2px; }
+
+.customer-name { font-weight: 700; font-size: 1.05rem; color: var(--ink); }
+.customer-detail { font-size: 0.8rem; color: var(--ink3); margin-top: 4px; }
+
+/* Toggle Buttons */
+.view-btn { border: none; cursor: pointer; transition: all 0.2s; }
+.view-btn.active { background: white !important; color: var(--ink) !important; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+/* Detail View Overrides */
+.contact-layout.view-detail { display: flex; flex-direction: column; gap: 16px; }
+.contact-layout.view-detail .customer-card { flex-direction: row; align-items: flex-start; justify-content: space-between; padding: 20px 24px; }
+.contact-layout.view-detail .card-body-left { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.contact-layout.view-detail .card-body-right { flex: unset; border-top: none; padding-top: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 16px; text-align: right; }
+
+/* Show/Hide Extra Details */
+.extra-details { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); width: 100%; max-width: 500px; }
+.contact-layout.view-detail .extra-details { display: block; }
+.contact-layout.view-detail .customer-detail { font-size: 0.9rem; } /* Slightly larger text for detail view */
 
 /* ─── SETTINGS ────────────────────────────────── */
 .settings-section { margin-bottom:28px; }
@@ -577,3 +603,69 @@ select.form-control { appearance:none; background-image:url("data:image/svg+xml,
 .tpl-option.selected { border-color:var(--accent); background:var(--accent-light); }
 .tpl-option-label { font-size:0.75rem; font-weight:600; color:var(--ink2); text-align:center; }
 .tpl-option.selected .tpl-option-label { color:var(--accent); }
+
+/* ═══════════════════════════════════════════════
+   MISSING UI FIXES (Expenses & Print Templates)
+   ═══════════════════════════════════════════════ */
+
+/* ─── 1. EXPENSES TABLE ─── */
+.invoice-table { width:100%; border-collapse:collapse; font-size:0.875rem; }
+.invoice-table th { background:var(--surface2); padding:12px 16px; text-align:left; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink3); border-bottom:1px solid var(--border); }
+.invoice-table td { padding:12px 16px; border-bottom:1px solid var(--border); vertical-align:middle; }
+.invoice-table tr:last-child td { border-bottom:none; }
+.invoice-table tr:hover td { background:var(--surface2); }
+
+/* ─── 2. PRINT TEMPLATE PICKER (SETTINGS) ─── */
+.template-item {
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  display: flex;
+  transition: 0.2s ease;
+  cursor: pointer;
+}
+.template-item:hover {
+  border-color: var(--accent2);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.template-item.active {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+.template-info {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.template-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: var(--accent2);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+.template-text {
+  display: flex;
+  flex-direction: column;
+}
+.template-text strong {
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+.template-text span {
+  font-size: 0.8rem;
+  color: var(--ink3);
+  margin-top: 4px;
+}
+.template-actions {
+  display: flex;
+  gap: 8px;
+}
+
