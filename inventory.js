@@ -1,111 +1,3 @@
-// ─── FETCH INVENTORY & REPORTS ────────────────
-async function fetchInventoryAndReports() {
-  try {
-    const res  = await fetch(API_URL + '?action=getAll&t=' + Date.now());
-    const data = await res.json();
-
-    // ─── CATCH AND APPLY BUSINESS SETTINGS FROM CLOUD ───
-    if (data.settings && Object.keys(data.settings).length > 0) {
-      // 1. Merge cloud settings into live memory
-      Object.assign(bizProfile, data.settings);
-      
-      // 2. Save to local storage so the app remembers it
-      localStorage.setItem('bs_settings', JSON.stringify(bizProfile));
-      
-      // 3. If there are logos/signatures, trigger them to show up
-      if (typeof loadSettingsPreviews === 'function') loadSettingsPreviews();
-    }
-
-    if (data.products && data.products.length > 1) {
-      inventoryStock.length = 0;
-      for (let i = 1; i < data.products.length; i++) {
-        const row = data.products[i];
-        if (row && row[0]) {
-          inventoryStock.push({
-            id:        row[0],
-            name:      row[1] || 'Unknown',
-            category:  row[2] || '', 
-            unit:      row[3] || '', 
-            costPrice: parseFloat(row[4]) || 0,
-            sellPrice: parseFloat(row[5]) || 0,
-            gstRate:   parseFloat(row[6]) || 0,
-            gstType:   row[7] || 'Exclusive',
-            stock:     parseFloat(row[8]) || 0,
-            hsn:       row[9] || '' // HSN Code
-          });
-        }
-      }
-    }
-
-    if (data.customers && data.customers.length > 1) {
-      customersArray.length = 0;
-      for (let i = 1; i < data.customers.length; i++) {
-        const row = data.customers[i];
-        if (row && row[1]) customersArray.push({ id: row[0], name: row[1], email: row[2], address: row[3], gstin: row[5] });
-      }
-    }
-
-    if (data.suppliers && data.suppliers.length > 1) {
-      suppliersArray.length = 0;
-      for (let i = 1; i < data.suppliers.length; i++) {
-        const row = data.suppliers[i];
-        if (row && row[1]) suppliersArray.push({ id: row[0], name: row[1], phone: row[2] || '', address: row[3] || '', paymentTerms: row[4] || '', gstin: row[5] });
-      }
-    }
-
-    if (data.invoices && data.invoiceItems) {
-      invoicesArray.length = 0; 
-      const newInvoices = data.invoices.slice(1).map(row => {
-        const invId = row[0];
-        const items = data.invoiceItems.slice(1).filter(ir => ir[0] === invId).map(ir => ({
-          description: ir[1], quantity: parseFloat(ir[2]), unitPrice: parseFloat(ir[3]), gstRate: parseFloat(ir[8]), hsn: ir[9] || ''
-        }));
-        return { 
-          invoiceId: invId, customerName: row[1], customerEmail: row[2], billingAddress: row[3], 
-          date: row[4], gstType: row[5], subtotal: parseFloat(row[6]), gstAmount: parseFloat(row[7]), 
-          discount: parseFloat(row[8]) || 0, grandTotal: parseFloat(row[9]) || 0, supplyType: row[10] || 'intra', status: row[11] || 'paid', items: items 
-        };
-      });
-      invoicesArray.push(...newInvoices);
-      localStorage.setItem("bs_invoices", JSON.stringify(invoicesArray));
-      const invInput = document.getElementById('invNumber');
-      if(invInput) invInput.value = getNextId(invoicesArray, 'INV');
-    }
-
-    if (data.purchases && data.purchaseItems) {
-      purchasesArray.length = 0; 
-      const newPurchases = data.purchases.slice(1).map(row => {
-        const poId = row[0];
-        const items = data.purchaseItems.slice(1).filter(ir => ir[0] === poId).map(ir => ({
-          product: ir[1], quantity: parseFloat(ir[2]), unitCost: parseFloat(ir[3]), gstRate: parseFloat(ir[8]), hsn: ir[9] || ''
-        }));
-        return { 
-          poNumber: poId, supplier: row[1], date: row[2], gstType: row[3], 
-          subtotal: parseFloat(row[4]), gstAmount: parseFloat(row[5]), totalAmount: parseFloat(row[6]), items: items 
-        };
-      });
-      purchasesArray.push(...newPurchases);
-      localStorage.setItem("bs_purchases", JSON.stringify(purchasesArray));
-      const poInput = document.getElementById('poNumber');
-      if(poInput) poInput.value = getNextId(purchasesArray, 'PO');
-    }
-
-    document.getElementById('statusLed').className = 'led';
-    document.getElementById('apiStatusLabel').textContent = 'Google Sheets Live';
-    document.getElementById('apiLastSync').textContent = 'Synced ' + new Date().toLocaleTimeString('en-IN');
-
-    updateDatalists(); renderInventoryTable(); renderProductGrid(); renderCustomerGrid();
-    renderSupplierGrid(); renderInvoiceLists(); renderPurchaseLists(); updateDashboard();
-
-  } catch(e) {
-    console.warn('API unavailable, using local data:', e.message);
-    document.getElementById('statusLed').className = 'led error';
-    document.getElementById('apiStatusLabel').textContent = 'Offline Mode';
-    document.getElementById('apiLastSync').textContent = 'Could not connect';
-    fallbackStock();
-  }
-}
-
 function fallbackStock() {
   if (!inventoryStock.length) {
     inventoryStock.push(
@@ -267,7 +159,7 @@ function openAddProduct() {
   document.getElementById('modalBody').innerHTML = `
     <div class="grid-3">
       <div class="form-group"><label class="form-label">Item Type</label><select class="form-control" id="npType" onchange="toggleItemType('n')"><option value="Goods">Goods</option><option value="Service">Service</option></select></div>
-      <div class="form-group"><label class="form-label">Item ID</label><input type="text" class="form-control" id="npId" placeholder="ITM-001"></div>
+      <div class="form-group"><label class="form-label">Item ID</label><input type="text" class="form-control" id="npId" value="${getNextId('product')}"></div>
       <div class="form-group"><label class="form-label">Barcode / EAN</label><input type="text" class="form-control" id="npBarcode" placeholder="Scan or type..."></div>
     </div>
     <div class="form-group"><label class="form-label">Item Name</label><input type="text" class="form-control" id="npName" placeholder="Enter product or service name"></div>
@@ -310,32 +202,6 @@ function calcPreviewMargin() {
   } else { preview.innerHTML = ''; }
 }
 
-// ─── 2. UPGRADED SAVE LOCAL FUNCTION ───
-function addProductLocal() {
-  const id        = document.getElementById('npId').value.trim();
-  const name      = document.getElementById('npName').value.trim();
-  const type      = document.getElementById('npType').value;
-  const barcode   = document.getElementById('npBarcode').value.trim();
-  const status    = document.getElementById('npStatus').value;
-  const category  = document.getElementById('npCat').value.trim();
-  const hsn       = document.getElementById('npHsn').value.trim();
-  const unit      = document.getElementById('npUnit').value.trim();
-  const sellPrice = parseFloat(document.getElementById('npSellPrice').value) || 0;
-  const costPrice = parseFloat(document.getElementById('npCostPrice').value) || 0;
-  const stock     = type === 'Service' ? 0 : (parseFloat(document.getElementById('npStock').value) || 0); // Services have 0 stock
-  const gstRate   = parseFloat(document.getElementById('npGst').value) || 0;
-  
-  if (!id || !name) { toast('Enter Item ID and Name', 'error'); return; }
-  if (inventoryStock.find(p => p.id === id)) { toast('Item ID already exists', 'error'); return; }
-  
-  inventoryStock.push({ id, name, type, barcode, status, category, hsn, unit, sellPrice, costPrice, gstRate, stock });
-  closeModal(); renderProductGrid(); renderInventoryTable(); updateDashboard(); updateDatalists();
-  
-  toast('Syncing to database...', 'warn');
-  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, 
-    body: JSON.stringify({ action: "addProduct", id, name, type, barcode, status, category, hsn, unit, costPrice, sellPrice, stock, gstRate }) 
-  }).then(() => toast(`${name} added!`, 'success'));
-}
 
 // ─── 3. UPGRADED EDIT PRODUCT MODAL ───
 function openEditProduct(id) {
@@ -392,133 +258,85 @@ function calcPreviewMarginEdit() {
   } else { preview.innerHTML = ''; }
 }
 
-// ─── 4. UPGRADED SAVE EDIT FUNCTION ───
-function saveEditProduct(id) {
+// ══════════════════════════════════════════════
+//        SUPABASE SYNC: PRODUCTS & INVENTORY
+// ══════════════════════════════════════════════
+async function addProductLocal() {
+  const id = document.getElementById('npId').value.trim();
+  const name = document.getElementById('npName').value.trim();
+  const type = document.getElementById('npType').value;
+  const barcode = document.getElementById('npBarcode').value.trim();
+  const status = document.getElementById('npStatus').value;
+  const category = document.getElementById('npCat').value.trim();
+  const hsn = document.getElementById('npHsn').value.trim();
+  const unit = document.getElementById('npUnit').value.trim();
+  const sellPrice = parseFloat(document.getElementById('npSellPrice').value) || 0;
+  const costPrice = parseFloat(document.getElementById('npCostPrice').value) || 0;
+  const stock = type === 'Service' ? 0 : (parseFloat(document.getElementById('npStock').value) || 0);
+  const gstRate = parseFloat(document.getElementById('npGst').value) || 0;
+  
+  if (!id || !name) { toast('Enter Item ID and Name', 'error'); return; }
+  if (inventoryStock.find(p => p.id === id)) { toast('Item ID already exists', 'error'); return; }
+  
+  // 1. Update UI Instantly
+  inventoryStock.push({ id, name, type, barcode, status, category, hsn, unit, sellPrice, costPrice, gstRate, stock });
+  closeModal(); renderProductGrid(); renderInventoryTable(); updateDatalists();
+  
+  // 2. Format for SQL (map camelCase to snake_case) and push
+  toast('Saving product to cloud...', 'info');
+  const dbPayload = { 
+    id: id, store_id: currentStoreId, name: name, type: type, barcode: barcode, 
+    status: status, category: category, hsn: hsn, unit: unit, 
+    sell_price: sellPrice, cost_price: costPrice, gst_rate: gstRate, stock: stock 
+  };
+  
+  const { error } = await supabase.from('inventory').insert([dbPayload]);
+  if (error) toast('Cloud save failed.', 'error');
+  else toast(`${name} added successfully!`, 'success');
+}
+
+async function saveEditProduct(id) {
   const p = inventoryStock.find(x => x.id === id);
   if (!p) return;
-  p.name      = document.getElementById('epName').value.trim()           || p.name;
-  p.type      = document.getElementById('epType').value;
-  p.barcode   = document.getElementById('epBarcode').value.trim()        || '';
-  p.status    = document.getElementById('epStatus').value;
-  p.category  = document.getElementById('epCat').value.trim()            || '';
-  p.hsn       = document.getElementById('epHsn').value.trim()            || '';
-  p.unit      = document.getElementById('epUnit').value.trim()           || '';
+  
+  p.name = document.getElementById('epName').value.trim() || p.name;
+  p.type = document.getElementById('epType').value;
+  p.barcode = document.getElementById('epBarcode').value.trim() || '';
+  p.status = document.getElementById('epStatus').value;
+  p.category = document.getElementById('epCat').value.trim() || '';
+  p.hsn = document.getElementById('epHsn').value.trim() || '';
+  p.unit = document.getElementById('epUnit').value.trim() || '';
   p.sellPrice = parseFloat(document.getElementById('epSellPrice').value) || 0;
   p.costPrice = parseFloat(document.getElementById('epCostPrice').value) || 0;
-  p.gstRate   = parseFloat(document.getElementById('epGst').value)       || 0;
-  p.stock     = p.type === 'Service' ? 0 : (parseFloat(document.getElementById('epStock').value) || 0); // Force 0 if Service
+  p.gstRate = parseFloat(document.getElementById('epGst').value) || 0;
+  p.stock = p.type === 'Service' ? 0 : (parseFloat(document.getElementById('epStock').value) || 0);
   
   closeModal(); renderProductGrid(); renderInventoryTable(); updateDatalists();
   
-  const payload = { action: "editProduct", id, name: p.name, type: p.type, barcode: p.barcode, status: p.status, category: p.category, hsn: p.hsn, unit: p.unit, costPrice: p.costPrice, sellPrice: p.sellPrice, stock: p.stock, gstRate: p.gstRate };
-  toast('Syncing changes to database...', 'warn');
-  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) })
-    .then(() => toast('Item updated successfully!', 'success'));
+  toast('Updating cloud...', 'info');
+  const dbPayload = { 
+    name: p.name, type: p.type, barcode: p.barcode, status: p.status, 
+    category: p.category, hsn: p.hsn, unit: p.unit, 
+    sell_price: p.sellPrice, cost_price: p.costPrice, gst_rate: p.gstRate, stock: p.stock 
+  };
+  
+  const { error } = await supabase.from('inventory').update(dbPayload).eq('id', id).eq('store_id', currentStoreId);
+  if (error) toast('Cloud update failed.', 'error');
+  else toast('Item updated successfully!', 'success');
 }
 
-function deleteProduct(id) {
+async function deleteProduct(id) {
   const idx = inventoryStock.findIndex(x => x.id === id);
   if (idx === -1) return;
-  const [removed] = inventoryStock.splice(idx, 1);
+  if(!confirm(`Permanently delete ${inventoryStock[idx].name}?`)) return;
+  
+  inventoryStock.splice(idx, 1);
   closeModal(); renderProductGrid(); renderInventoryTable(); updateDatalists();
-  toast(`${removed.name} deleted`, 'warn', () => {
-    inventoryStock.splice(idx, 0, removed);
-    renderProductGrid(); renderInventoryTable(); updateDatalists();
-    toast('Undo successful', 'success');
-  });
-}
-
-// ─── CUSTOMERS & SUPPLIERS DIRECTORIES (Unchanged) ───────────────
-function renderCustomerGrid() {
-  const grid = document.getElementById('customerGrid');
-  if (!grid) return;
-  const q = (document.getElementById('customerSearch')?.value || '').toLowerCase();
-  const filtered = customersArray.filter(c => (c.name || '').toLowerCase().includes(q) || (c.email || '').toLowerCase().includes(q));
-  if (!filtered.length) { grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><i class="fas fa-users"></i><p>No customers yet</p></div>'; return; }
-  const invSummary = {};
-  invoicesArray.forEach(i => {
-    const key = (i.customerName || '').toLowerCase();
-    if (!invSummary[key]) invSummary[key] = { count: 0, total: 0 };
-    invSummary[key].count++; invSummary[key].total += (i.grandTotal || 0);
-  });
-  grid.innerHTML = filtered.map(c => {
-    const summ = invSummary[(c.name||'').toLowerCase()] || { count: 0, total: 0 };
-    return `<div class="customer-card">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-        <div class="customer-name" style="cursor:pointer" onclick="openCustomerLedger('${esc(c.id)}')"><i class="fas fa-user-circle" style="color:var(--accent2);margin-right:6px"></i>${esc(c.name)}</div>
-        <button class="btn-icon info" style="width:28px;height:28px;font-size:0.75rem;flex-shrink:0" onclick="openEditCustomer('${esc(c.id)}')" title="Edit customer"><i class="fas fa-pen"></i></button>
-      </div>
-      ${c.email ? `<div class="customer-detail"><i class="fas fa-envelope" style="margin-right:4px"></i>${esc(c.email)}</div>` : ''}
-      ${c.phone ? `<div class="customer-detail"><i class="fas fa-phone" style="margin-right:4px"></i>${esc(c.phone)}</div>` : ''}
-      ${c.address ? `<div class="customer-detail"><i class="fas fa-map-marker-alt" style="margin-right:4px"></i>${esc(c.address)}</div>` : ''}
-      <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="openCustomerLedger('${esc(c.id)}')">
-        <span style="font-size:0.78rem;color:var(--accent2);font-weight:600">${summ.count} invoice${summ.count!==1?'s':''}</span>
-        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9rem;color:var(--accent)">${fmt(summ.total)}</span>
-      </div></div>`;
-  }).join('');
-}
-
-function filterCustomers() { renderCustomerGrid(); }
-
-function openAddCustomer() {
-  document.getElementById('modalTitle').textContent = 'Add Customer';
-  document.getElementById('modalBody').innerHTML = `
-    <div class="form-group"><label class="form-label">Name</label><input type="text" class="form-control" id="ncName" placeholder="Customer name"></div>
-    <div class="grid-2">
-      <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-control" id="ncEmail" placeholder="email@example.com"></div>
-      <div class="form-group"><label class="form-label">Phone</label><input type="text" class="form-control" id="ncPhone" placeholder="+91 00000 00000"></div>
-    </div>
-    <div class="form-group"><label class="form-label">GSTIN (Optional)</label><input type="text" class="form-control" id="ncGstin" placeholder="22AAAAA0000A1Z5" style="text-transform:uppercase"></div>
-    <div class="form-group"><label class="form-label">Address</label><textarea class="form-control" id="ncAddr" placeholder="Address..."></textarea></div>
-    <div style="margin-top:16px"><button class="btn btn-primary" onclick="addCustomerLocal()"><i class="fas fa-user-plus"></i> Add Customer</button></div>`;
-  document.getElementById('detailModal').classList.add('open');
-}
-
-function addCustomerLocal() {
-  const name = document.getElementById('ncName').value.trim();
-  if (!name) { toast('Enter a name', 'error'); return; }
-  const c = { id: 'CUST-' + Date.now().toString().slice(-6), name, email: document.getElementById('ncEmail').value.trim(), phone: document.getElementById('ncPhone').value.trim(), gstin: document.getElementById('ncGstin').value.trim().toUpperCase(), address: document.getElementById('ncAddr').value.trim() };
-  customersArray.push(c); updateDatalists(); closeModal(); renderCustomerGrid();
-  toast(`Syncing ${name} to database...`, 'warn');
-  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "saveCustomer", ...c }) }).then(() => toast('Customer saved permanently!', 'success'));
-}
-
-function openEditCustomer(id) {
-  const c = customersArray.find(x => String(x.id) === String(id));
-  if (!c) return;
-  document.getElementById('modalTitle').textContent = 'Edit Customer';
-  document.getElementById('modalBody').innerHTML = `
-    <div class="form-group"><label class="form-label">Name</label><input type="text" class="form-control" id="ecName" value="${esc(c.name)}"></div>
-    <div class="grid-2">
-      <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-control" id="ecEmail" value="${esc(c.email||'')}"></div>
-      <div class="form-group"><label class="form-label">Phone</label><input type="text" class="form-control" id="ecPhone" value="${esc(c.phone||'')}"></div>
-    </div>
-    <div class="form-group"><label class="form-label">GSTIN</label><input type="text" class="form-control" id="ecGstin" value="${esc(c.gstin||'')}" style="text-transform:uppercase"></div>
-    <div class="form-group"><label class="form-label">Address</label><textarea class="form-control" id="ecAddr">${esc(c.address||'')}</textarea></div>
-    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" onclick="saveEditCustomer('${esc(id)}')"><i class="fas fa-save"></i> Save Changes</button><button class="btn btn-danger btn-sm" onclick="deleteCustomer('${esc(id)}')"><i class="fas fa-trash"></i> Delete</button></div>`;
-  document.getElementById('detailModal').classList.add('open');
-}
-
-function saveEditCustomer(id) {
-  const c = customersArray.find(x => String(x.id) === String(id));
-  if (!c) return;
-  const name = document.getElementById('ecName').value.trim();
-  if (!name) { toast('Name cannot be empty', 'error'); return; }
-  const oldName = c.name;
-  c.name = name; c.email = document.getElementById('ecEmail').value.trim(); c.phone = document.getElementById('ecPhone').value.trim(); c.gstin = document.getElementById('ecGstin').value.trim().toUpperCase(); c.address = document.getElementById('ecAddr').value.trim();
-  if (oldName.toLowerCase() !== name.toLowerCase()) { invoicesArray.forEach(i => { if (i.customerName.toLowerCase() === oldName.toLowerCase()) i.customerName = name; }); localStorage.setItem('bs_invoices', JSON.stringify(invoicesArray)); }
-  updateDatalists(); closeModal(); renderCustomerGrid();
-  toast('Syncing changes to database...', 'warn');
-  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "editCustomer", ...c }) }).then(() => toast(`${name} updated successfully`, 'success'));
-}
-
-function deleteCustomer(id) {
-  const idx = customersArray.findIndex(x => String(x.id) === String(id));
-  if (idx === -1) return;
-  if (!confirm(`Delete ${customersArray[idx].name}? Their invoice history will remain.`)) return;
-  const [removed] = customersArray.splice(idx, 1); updateDatalists(); closeModal(); renderCustomerGrid();
-  toast('Deleting from database...', 'warn');
-  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "deleteCustomer", id: String(id) }) }).then(() => toast(`${removed.name} deleted permanently`, 'success'));
+  
+  toast('Deleting from cloud...', 'warn');
+  const { error } = await supabase.from('inventory').delete().eq('id', id).eq('store_id', currentStoreId);
+  if (error) toast('Delete failed.', 'error');
+  else toast('Product deleted permanently.', 'success');
 }
 
 function openCustomerLedger(id) {
@@ -540,98 +358,6 @@ function openCustomerLedger(id) {
     <div style="font-weight:700;font-size:0.85rem;margin-bottom:10px;color:var(--ink)">Invoice History</div>
     ${invs.length ? invs.map(i => `<div class="list-item" onclick="closeModal();showInvoiceDetail('${esc(i.invoiceId)}')"><div><div class="list-item-title">${esc(i.invoiceId)}</div><div class="list-item-sub">${dateLabel(i.date)}</div></div><div style="text-align:right"><div class="list-item-amount">${fmt(i.grandTotal)}</div>${getStatusBadge(i)}</div></div>`).join('') : '<div class="empty-state"><i class="fas fa-file"></i><p>No invoices for this customer</p></div>'}`;
   document.getElementById('detailModal').classList.add('open');
-}
-
-function renderSupplierGrid() {
-  const grid = document.getElementById('supplierGrid');
-  if (!grid) return;
-  const q = (document.getElementById('supplierSearch')?.value || '').toLowerCase();
-  const filtered = suppliersArray.filter(s => (s.name || '').toLowerCase().includes(q));
-  if (!filtered.length) { grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><i class="fas fa-building"></i><p>No suppliers yet</p></div>'; return; }
-  const purSummary = {};
-  purchasesArray.forEach(p => {
-    const key = (p.supplier || '').toLowerCase();
-    if (!purSummary[key]) purSummary[key] = { count: 0, total: 0 };
-    purSummary[key].count++; purSummary[key].total += (p.totalAmount || 0);
-  });
-  grid.innerHTML = filtered.map(s => {
-    const summ = purSummary[(s.name||'').toLowerCase()] || { count: 0, total: 0 };
-    return `<div class="customer-card">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-        <div class="customer-name"><i class="fas fa-building" style="color:var(--accent2);margin-right:6px"></i>${esc(s.name)}</div>
-        <button class="btn-icon info" style="width:28px;height:28px;font-size:0.75rem;flex-shrink:0" onclick="openEditSupplier('${esc(s.id)}')" title="Edit supplier"><i class="fas fa-pen"></i></button>
-      </div>
-      ${s.phone ? `<div class="customer-detail"><i class="fas fa-phone" style="margin-right:4px"></i>${esc(s.phone)}</div>` : ''}
-      ${s.address ? `<div class="customer-detail"><i class="fas fa-map-marker-alt" style="margin-right:4px"></i>${esc(s.address)}</div>` : ''}
-      ${s.paymentTerms ? `<div class="customer-detail"><i class="fas fa-clock" style="margin-right:4px"></i>${esc(s.paymentTerms)}</div>` : ''}
-      <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:0.78rem;color:var(--info);font-weight:600">${summ.count} purchase${summ.count!==1?'s':''}</span>
-        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9rem;color:var(--gold)">${fmt(summ.total)}</span>
-      </div></div>`;
-  }).join('');
-}
-
-function filterSuppliers() { renderSupplierGrid(); }
-
-function openAddSupplier() {
-  document.getElementById('modalTitle').textContent = 'Add Supplier';
-  document.getElementById('modalBody').innerHTML = `
-    <div class="form-group"><label class="form-label">Supplier Name</label><input type="text" class="form-control" id="nsName" placeholder="Supplier / vendor name"></div>
-    <div class="grid-2">
-      <div class="form-group"><label class="form-label">Phone</label><input type="text" class="form-control" id="nsPhone" placeholder="+91 00000 00000"></div>
-      <div class="form-group"><label class="form-label">Payment Terms</label><input type="text" class="form-control" id="nsPay" placeholder="e.g. Net 30"></div>
-    </div>
-    <div class="form-group"><label class="form-label">GSTIN (Optional)</label><input type="text" class="form-control" id="nsGstin" placeholder="22AAAAA0000A1Z5" style="text-transform:uppercase"></div>
-    <div class="form-group"><label class="form-label">Address</label><textarea class="form-control" id="nsAddr" placeholder="Address..."></textarea></div>
-    <div style="margin-top:16px"><button class="btn btn-primary" onclick="addSupplierLocal()"><i class="fas fa-plus"></i> Add Supplier</button></div>`;
-  document.getElementById('detailModal').classList.add('open');
-}
-
-function addSupplierLocal() {
-  const name = document.getElementById('nsName').value.trim();
-  if (!name) { toast('Enter a supplier name', 'error'); return; }
-  const s = { id: 'SUPP-' + Date.now().toString().slice(-6), name, phone: document.getElementById('nsPhone').value.trim(), gstin: document.getElementById('nsGstin').value.trim().toUpperCase(), address: document.getElementById('nsAddr').value.trim(), paymentTerms: document.getElementById('nsPay').value.trim() };
-  suppliersArray.push(s); updateDatalists(); closeModal(); renderSupplierGrid();
-  toast(`Syncing ${name} to database...`, 'warn');
-  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "saveSupplier", ...s }) }).then(() => toast('Supplier saved permanently!', 'success'));
-}
-
-function openEditSupplier(id) {
-  const s = suppliersArray.find(x => x.id === id);
-  if (!s) return;
-  document.getElementById('modalTitle').textContent = 'Edit Supplier';
-  document.getElementById('modalBody').innerHTML = `
-    <div class="form-group"><label class="form-label">Supplier Name</label><input type="text" class="form-control" id="esName" value="${esc(s.name)}"></div>
-    <div class="grid-2">
-      <div class="form-group"><label class="form-label">Phone</label><input type="text" class="form-control" id="esPhone" value="${esc(s.phone||'')}"></div>
-      <div class="form-group"><label class="form-label">Payment Terms</label><input type="text" class="form-control" id="esPay" value="${esc(s.paymentTerms||'')}"></div>
-    </div>
-    <div class="form-group"><label class="form-label">GSTIN</label><input type="text" class="form-control" id="esGstin" value="${esc(s.gstin||'')}" style="text-transform:uppercase"></div>
-    <div class="form-group"><label class="form-label">Address</label><textarea class="form-control" id="esAddr">${esc(s.address||'')}</textarea></div>
-    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" onclick="saveEditSupplier('${esc(id)}')"><i class="fas fa-save"></i> Save Changes</button><button class="btn btn-danger btn-sm" onclick="deleteSupplier('${esc(id)}')"><i class="fas fa-trash"></i> Delete</button></div>`;
-  document.getElementById('detailModal').classList.add('open');
-}
-
-function saveEditSupplier(id) {
-  const s = suppliersArray.find(x => x.id === id);
-  if (!s) return;
-  const name = document.getElementById('esName').value.trim();
-  if (!name) { toast('Name cannot be empty', 'error'); return; }
-  const oldName = s.name;
-  s.name = name; s.phone = document.getElementById('esPhone').value.trim(); s.gstin = document.getElementById('esGstin').value.trim().toUpperCase(); s.address = document.getElementById('esAddr').value.trim(); s.paymentTerms = document.getElementById('esPay').value.trim();
-  if (oldName.toLowerCase() !== name.toLowerCase()) { purchasesArray.forEach(p => { if ((p.supplier||'').toLowerCase() === oldName.toLowerCase()) p.supplier = name; }); localStorage.setItem('bs_purchases', JSON.stringify(purchasesArray)); }
-  updateDatalists(); closeModal(); renderSupplierGrid();
-  toast(`Syncing changes to database...`, 'warn');
-  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "editSupplier", ...s }) }).then(() => toast(`${name} updated successfully`, 'success'));
-}
-
-function deleteSupplier(id) {
-  const idx = suppliersArray.findIndex(x => x.id === id);
-  if (idx === -1) return;
-  if (!confirm(`Delete ${suppliersArray[idx].name}? Their purchase history will remain.`)) return;
-  const [removed] = suppliersArray.splice(idx, 1); updateDatalists(); closeModal(); renderSupplierGrid();
-  toast(`Deleting from database...`, 'warn');
-  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "deleteSupplier", id: id }) }).then(() => toast(`${removed.name} deleted permanently`, 'success'));
 }
 
 function updateDatalists() {
