@@ -99,7 +99,9 @@ function setDiscType(type) {
   calcInvoiceTotals();
 }
 
-function saveInvoice() {
+// ─── CLOUD SYNC: SAVE INVOICE ────────────────────────────
+// ─── SUPABASE SYNC: SAVE INVOICE ────────────────────────────
+async function saveInvoice() {
   if (App.isSaving) return;
  
   document.querySelectorAll('.inv-field').forEach(inp => {
@@ -126,9 +128,10 @@ function saveInvoice() {
   const statusSelect = document.getElementById('invStatusSelect');
   const status = statusSelect ? statusSelect.value : 'unpaid';
  
+  // 1. Build the Supabase Payload
   const payload = {
-    action: isEditing ? "editInvoice" : "saveInvoice",
     invoiceId: invId,
+    store_id: currentStoreId, // <-- CRUCIAL FOR MULTI-STORE ISOLATION
     date: document.getElementById('invDate').value,
     customerName: document.getElementById('customerName').value,
     customerEmail: document.getElementById('customerEmail').value,
@@ -136,22 +139,24 @@ function saveInvoice() {
     gstType: invGstType,
     supplyType: App.currentInvoiceSupplyType || 'intra',
     items: invLineItems.map(i => ({ description: i.desc, hsn: i.hsn, quantity: parseFloat(i.qty), unitPrice: parseFloat(i.price), gstRate: i.gstRate })),
-    subtotal: sub, gstAmount: gstTotal, discount, grandTotal: grand, status
+    subtotal: sub, gstAmount: gstTotal, discount: discount, grandTotal: grand, status: status
   };
  
   App.isSaving = true;
   const saveBtn = document.getElementById('saveInvoiceBtn');
   if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…'; }
  
+  // 1. Auto-save new customer quietly to Supabase
   const customerName = document.getElementById('customerName').value.trim();
   const customerGstin = document.getElementById('customerGstin') ? document.getElementById('customerGstin').value.trim().toUpperCase() : '';
-  
   if (customerName && !customersArray.find(c => c.name.toLowerCase() === customerName.toLowerCase())) {
-    const newCust = { id: 'CUST-' + Date.now().toString().slice(-5), name: customerName, email: payload.customerEmail || '', phone: '', gstin: customerGstin, address: payload.billingAddress || '' };
+    const newCust = { id: 'CUST-' + Date.now().toString().slice(-5), store_id: currentStoreId, name: customerName, email: payload.customerEmail || '', phone: '', gstin: customerGstin, address: payload.billingAddress || '' };
     customersArray.push(newCust);
-    fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "saveCustomer", ...newCust }) });
+    const dbCust = { id: newCust.id, store_id: currentStoreId, name: customerName, email: payload.customerEmail || '', phone: '', gstin: customerGstin, address: payload.billingAddress || '' };
+    supabase.from('customers').insert([dbCust]).then(); 
   }
  
+  // 2. Reverse old stock if editing an existing invoice
   if (isEditing) {
     const oldInv = invoicesArray.find(i => i.invoiceId === invId);
     if (oldInv) {
@@ -164,49 +169,86 @@ function saveInvoice() {
     App.editingInvoiceId = null;
   }
  
+  // 3. Deduct new stock & Auto-Create new products in Supabase!
+  const inventoryUpdates = [];
+  const inventoryInserts = [];
+  
   invLineItems.forEach(it => {
     const existing = inventoryStock.find(p => p.name.toLowerCase() === it.desc.toLowerCase());
-    if (existing) { existing.stock = (existing.stock || 0) - it.qty; } 
+    if (existing) { 
+      existing.stock = (existing.stock || 0) - parseFloat(it.qty); 
+      inventoryUpdates.push({
+        id: existing.id, store_id: currentStoreId, name: existing.name, type: existing.type || 'Goods', 
+        barcode: existing.barcode || '', status: existing.status || 'Active', category: existing.category || '', 
+        hsn: existing.hsn || '', unit: existing.unit || '', sell_price: existing.sellPrice, 
+        cost_price: existing.costPrice, gst_rate: existing.gstRate, stock: existing.stock
+      });
+    } 
     else {
-      inventoryStock.push({ id: 'P-' + Date.now().toString().slice(-5), name: it.desc, hsn: it.hsn, sellPrice: it.price, costPrice: it.price * 0.7, gstRate: it.gstRate, stock: 0 });
+      const newId = getNextId('product'); // <--- Fixed Random ID
+      const newProd = { id: newId, store_id: currentStoreId, name: it.desc, hsn: it.hsn, sellPrice: it.price, costPrice: it.price * 0.7, gstRate: it.gstRate, stock: -parseFloat(it.qty), type: 'Goods', status: 'Active', category: '', unit: 'PCS', barcode: '' }; // <--- Blank Category
+      inventoryStock.push(newProd);
+      inventoryInserts.push({
+        id: newId, store_id: currentStoreId, name: it.desc, hsn: it.hsn || '', sell_price: it.price, cost_price: it.price * 0.7, gst_rate: it.gstRate, stock: -parseFloat(it.qty), type: 'Goods', status: 'Active', category: '', unit: 'PCS', barcode: ''
+      });
     }
   });
+  
+  // 4. Fire Supabase background syncs for stock
+  if (inventoryUpdates.length > 0) {
+    inventoryUpdates.forEach(u => supabase.from('inventory').update(u).eq('id', u.id).eq('store_id', currentStoreId).then());
+  }
+  if (inventoryInserts.length > 0) {
+    supabase.from('inventory').insert(inventoryInserts).then();
+  }
  
-  if (typeof updateDatalists === 'function') updateDatalists();
-  if (typeof renderInventoryTable === 'function') renderInventoryTable();
+  if (typeof renderProductGrid === 'function') renderProductGrid();
+  if (typeof renderCustomerGrid === 'function') renderCustomerGrid();
  
-  invoicesArray.unshift({ ...payload, timestamp: new Date().toISOString() });
-  localStorage.setItem("bs_invoices", JSON.stringify(invoicesArray));
+  // 2. Update UI instantly
+  invoicesArray.unshift({ ...payload, created_at: new Date().toISOString() });
   renderInvoiceLists(); 
   if (typeof updateDashboard === 'function') updateDashboard();
   
+  // 3. Push to Supabase Cloud
+  let dbError;
+  if (isEditing) {
+    const { error } = await supabase.from('invoices').update(payload).eq('invoiceId', invId).eq('store_id', currentStoreId);
+    dbError = error;
+  } else {
+    const { error } = await supabase.from('invoices').insert([payload]);
+    dbError = error;
+  }
+
   App.isSaving = false;
   if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Invoice'; }
 
-  if (App.postSaveAction === 'close') {
-    clearInvoiceForm(true);
-    if (typeof closeInvoiceEditor === 'function') closeInvoiceEditor();
-    toast(`Invoice ${invId} saved successfully!`, 'success');
-  } 
-  else if (App.postSaveAction === 'print') {
-    const printHtml = buildInvoiceHTML(payload, bizProfile.printTemplate || 'tpl-standard', false);
-    const printWin = window.open('', '_blank');
-    if (printWin) { printWin.document.write(printHtml); printWin.document.close(); }
-    App.editingInvoiceId = payload.invoiceId; 
-    const tEdit = document.getElementById('tabEditInvoice');
-    if (tEdit) tEdit.style.display = 'inline-flex';
-    toast(`Invoice ${invId} saved & printing...`, 'success');
-    App.isDirty = false;
+  if (dbError) {
+    console.error("Supabase Save Error:", dbError);
+    toast('Cloud save failed.', 'error');
+  } else {
+    if (App.postSaveAction === 'close') {
+      clearInvoiceForm(true);
+      if (typeof closeInvoiceEditor === 'function') closeInvoiceEditor();
+      toast(`Invoice ${invId} saved successfully!`, 'success');
+    } 
+    else if (App.postSaveAction === 'print') {
+      const printHtml = buildInvoiceHTML(payload, bizProfile.printTemplate || 'tpl-standard', false);
+      const printWin = window.open('', '_blank');
+      if (printWin) { printWin.document.write(printHtml); printWin.document.close(); }
+      App.editingInvoiceId = payload.invoiceId; 
+      const tEdit = document.getElementById('tabEditInvoice');
+      if (tEdit) tEdit.style.display = 'inline-flex';
+      toast(`Invoice ${invId} saved & printing...`, 'success');
+      App.isDirty = false;
+    }
+    else if (App.postSaveAction === 'save') {
+      App.editingInvoiceId = payload.invoiceId; 
+      const tEdit = document.getElementById('tabEditInvoice');
+      if (tEdit) tEdit.style.display = 'inline-flex';
+      toast(`Invoice ${invId} saved!`, 'success');
+    }
   }
-  else if (App.postSaveAction === 'save') {
-    App.editingInvoiceId = payload.invoiceId; 
-    const tEdit = document.getElementById('tabEditInvoice');
-    if (tEdit) tEdit.style.display = 'inline-flex';
-    toast(`Invoice ${invId} saved! You can continue editing.`, 'success');
-  }
-
-  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) })
-    .catch(err => console.error("Background sync failed", err));
 }
 
 function clearInvoiceForm(force = false) {
@@ -227,7 +269,7 @@ function clearInvoiceForm(force = false) {
   App.currentInvoiceSupplyType = 'intra';
 
   const invNum = document.getElementById('invNumber');
-  if (invNum) { invNum.value = getNextId(invoicesArray, 'INV'); invNum.readOnly = false; invNum.style.backgroundColor = ''; }
+  if (invNum) { invNum.value = getNextId('invoice'); invNum.readOnly = false; invNum.style.backgroundColor = ''; }
   const invDate = document.getElementById('invDate');
   if (invDate) invDate.value = today();
 
@@ -341,15 +383,17 @@ function printSavedInvoice(id) {
   if (typeof closeModal === 'function') closeModal(); 
 }
 
-function updateInvStatus(id) {
+// ─── SUPABASE SYNC: UPDATE STATUS ───────────────────────────
+async function updateInvStatus(id) {
   const inv = invoicesArray.find(i => i.invoiceId === id);
   if (inv) {
     inv.status = document.getElementById('invStatusSel').value;
-    localStorage.setItem("bs_invoices", JSON.stringify(invoicesArray));
     renderInvoiceLists();
-    toast('Syncing status…', 'warn');
-    fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "updateInvoiceStatus", invoiceId: id, status: inv.status }) })
-      .then(() => toast('Status saved', 'success'));
+    toast('Syncing status to cloud...', 'warn');
+    
+    const { error } = await supabase.from('invoices').update({ status: inv.status }).eq('invoiceId', id).eq('store_id', currentStoreId);
+    if (error) toast('Cloud save failed.', 'error');
+    else toast('Status saved successfully', 'success');
   }
 }
 
@@ -357,7 +401,7 @@ function duplicateInvoice(id) {
   const inv = invoicesArray.find(i => i.invoiceId === id);
   if (!inv) return;
   App.editingInvoiceId = null; App.editingInvoiceStatus = 'unpaid';
-  document.getElementById('invNumber').value = getNextId(invoicesArray, 'INV');
+  document.getElementById('invNumber').value = getNextId('invoice');
   document.getElementById('invNumber').readOnly = false;
   document.getElementById('invNumber').style.backgroundColor = '';
   document.getElementById('invDate').value = today();
@@ -378,20 +422,27 @@ function duplicateInvoice(id) {
   toast(`Loaded ${id} as a copy.`, 'success');
 }
 
-function deleteInvoice(id) {
+// ─── SUPABASE SYNC: DELETE INVOICE ───────────────────────────
+async function deleteInvoice(id) {
   if (!confirm(`Permanently delete ${id}?`)) return;
   const invToDelete = invoicesArray.find(i => i.invoiceId === id);
   if (!invToDelete) return;
+  
   (invToDelete.items || []).forEach(oldIt => {
     const existing = inventoryStock.find(p => p.name.toLowerCase() === oldIt.description.toLowerCase());
     if (existing) existing.stock = (existing.stock || 0) + parseFloat(oldIt.quantity);
   });
+  
   const idx = invoicesArray.findIndex(i => i.invoiceId === id);
   if (idx > -1) invoicesArray.splice(idx, 1);
-  localStorage.setItem("bs_invoices", JSON.stringify(invoicesArray));
+  
   closeModal(); renderInvoiceLists(); updateDashboard();
   if (typeof renderInventoryTable === 'function') renderInventoryTable();
-  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "deleteInvoice", invoiceId: id }) }).then(() => toast('Invoice deleted', 'warn'));
+  
+  toast('Deleting from cloud...', 'warn');
+  const { error } = await supabase.from('invoices').delete().eq('invoiceId', id).eq('store_id', currentStoreId);
+  if (error) toast('Delete failed.', 'error');
+  else toast('Invoice deleted', 'success');
 }
 
 function loadEditInvoice(id) {
@@ -468,236 +519,3 @@ function downloadCSV(content, filename) {
   toast('CSV exported!', 'success');
 }
 
-function showSamplePreview(templateName) {
-  const sampleData = {
-    bizName: bizProfile.name || 'BillingSuite Pro',
-    bizAddr: bizProfile.address || '123 Business Street, Mumbai, MH 400001',
-    bizGst:  bizProfile.gstin || '22AAAAA0000A1Z5',
-    bizPan:  bizProfile.pan || 'ABCDE1234F',
-    bizContact: bizProfile.phone || '+91 98765 43210',
-    bankName: bizProfile.bankName || 'HDFC Bank',
-    bankAcc:  bizProfile.bankAcc  || '50100123456789',
-    bankIFSC: bizProfile.bankIFSC || 'HDFC0001234',
-    terms:    bizProfile.terms || '1. Goods once sold will not be taken back.\n2. Payment due within 30 days.',
-    invNo: 'INV-2026-001',
-    invDate: today(),
-    clientName: 'Sample Customer Pvt. Ltd.',
-    clientEmail: 'buyer@example.com',
-    clientAddr: '456 Client Avenue, Delhi 110001',
-    gstType: 'Exclusive',
-    supplyType: 'intra',
-    items: [
-      { description: 'Product A — Premium Widget', hsn: '8517', quantity: 2, unitPrice: 5000, gstRate: 0.18 },
-      { description: 'Service B — Installation', hsn: '9987', quantity: 1, unitPrice: 2500, gstRate: 0.18 },
-    ],
-    discount: 500,
-  };
-  const html = buildInvoiceHTML(sampleData, templateName, true);
-  const modal = document.getElementById('sampleModal');
-  const content = document.getElementById('sampleContent');
-  if (!modal || !content) return;
-  content.innerHTML = `<iframe srcdoc="${html.replace(/"/g, '&quot;')}" style="width:100%;height:100%;border:none;flex:1"></iframe>`;
-  modal.classList.add('open');
-}
-
-function closeSampleModal() {
-  const modal = document.getElementById('sampleModal');
-  if (modal) modal.classList.remove('open');
-  const content = document.getElementById('sampleContent');
-  if (content) content.innerHTML = '';
-}
-
-// ─── BUILD INVOICE HTML (Upgraded with HSN, POS, Bank Details) ──
-function buildInvoiceHTML(invData, templateName, isSample) {
-  const form = invData || {};
-  const getLive = (id) => document.getElementById(id) ? document.getElementById(id).value : '';
-
-  // Get dynamic state codes for POS printing
-  const myStateCode = bizProfile.state || '';
-  const custGSTIN = form.customerGstin || document.getElementById('customerGstin')?.value || '';
-  const custStateCode = custGSTIN.substring(0, 2);
-
-  // Safely define POS name based on state codes
-  let placeOfSupplyStr = "";
-  if (GST_STATE_CODES && custStateCode && GST_STATE_CODES[custStateCode]) {
-    placeOfSupplyStr = `${GST_STATE_CODES[custStateCode]} (${custStateCode})`;
-  } else if (GST_STATE_CODES && myStateCode && GST_STATE_CODES[myStateCode]) {
-    placeOfSupplyStr = `${GST_STATE_CODES[myStateCode]} (${myStateCode})`; // Fallback to own state
-  }
-
-  const data = {
-    bizName: bizProfile.name || '',
-    bizAddr: bizProfile.address || '',
-    bizContact: bizProfile.phone || '',
-    bizGst: bizProfile.gstin || '',
-    bankName: bizProfile.bankName || '',
-    bankAcc: bizProfile.bankAcc || '',
-    bankIFSC: bizProfile.bankIFSC || '',
-    logo: bizProfile.logo || '',           
-    signature: bizProfile.signature || '', 
-    
-    invNo: form.invoiceId || form.invNo || getLive('invNumber') || 'DRAFT',
-    invDate: form.date || form.invDate || getLive('invDate') || today(),
-    customerName: form.customerName || form.clientName || getLive('customerName') || 'Customer',
-    customerEmail: form.customerEmail || form.clientEmail || getLive('customerEmail') || '',
-    billingAddress: form.billingAddress || form.clientAddr || getLive('billingAddr') || '',
-    placeOfSupply: placeOfSupplyStr,
-    
-    gstType: form.gstType || (typeof invGstType !== 'undefined' ? invGstType : 'Exclusive'),
-    supplyType: form.supplyType || (typeof App !== 'undefined' ? App.currentInvoiceSupplyType : 'intra') || 'intra',
-    
-    savedDiscount: form.discount !== undefined ? parseFloat(form.discount) : undefined,
-    liveDiscVal: parseFloat(getLive('invDiscountVal')) || 0,
-    liveDiscType: typeof invDiscType !== 'undefined' ? invDiscType : 'flat'
-  };
-
-  let rawItems = (form.items && form.items.length > 0) ? form.items : (typeof invLineItems !== 'undefined' ? invLineItems : []);
-  data.items = rawItems.map(i => ({
-    desc: i.description || i.desc || '',
-    hsn: i.hsn || '',
-    qty: parseFloat(i.quantity || i.qty) || 0,
-    price: parseFloat(i.unitPrice || i.price) || 0,
-    gstRate: parseFloat(i.gstRate) || 0
-  }));
-
-  let sub = 0, gstTotal = 0, grand = 0;
-  let itemsRows = "";
-
-  data.items.forEach((it, index) => {
-    if (!it.desc || it.desc.trim().toLowerCase() === 'add item') return; 
-    const { gst, subtotalPart, total } = calcGST(it.qty * it.price, it.gstRate, data.gstType);
-    sub += subtotalPart; gstTotal += gst; grand += total;
-
-    itemsRows += `<tr>
-      <td style="text-align:center">${index + 1}</td>
-      <td>${esc(it.desc)}</td>
-      <td>${esc(it.hsn)}</td>
-      <td style="text-align:center">${it.qty}</td>
-      <td style="text-align:right">${fmt(it.price)}</td>
-      <td style="text-align:right">${fmt(subtotalPart)}</td>
-      <td style="text-align:center">${(it.gstRate * 100).toFixed(0)}%</td>
-      <td style="text-align:right">${fmt(gst)}</td>
-      <td style="text-align:right">${fmt(total)}</td>
-    </tr>`;
-  });
-
-  let finalDiscount = 0;
-  if (data.savedDiscount !== undefined) finalDiscount = data.savedDiscount;
-  else if (data.liveDiscVal > 0) finalDiscount = data.liveDiscType === 'pct' ? (grand * (data.liveDiscVal / 100)) : Math.min(data.liveDiscVal, grand);
-  grand -= finalDiscount;
-
-  let discountHTML = "";
-  if (finalDiscount > 0) discountHTML = `<div style="color:#10b981; margin-bottom:6px; font-size:0.9em; font-weight:600;">Discount: – ${fmt(finalDiscount)}</div>`;
-
-  let gstBreakdownHTML = "";
-  if (data.supplyType === 'inter') {
-    gstBreakdownHTML = `<div style="color:#475569; margin-bottom:6px; font-size:0.9em;">Total IGST: ${fmt(gstTotal)}</div>`;
-  } else {
-    gstBreakdownHTML = `<div style="color:#475569; margin-bottom:6px; font-size:0.9em;">Total CGST: ${fmt(gstTotal / 2)}</div>
-                        <div style="color:#475569; margin-bottom:6px; font-size:0.9em;">Total SGST: ${fmt(gstTotal / 2)}</div>`;
-  }
-
-  const logoHTML = data.logo ? `<img src="${data.logo}" style="max-height:80px; margin-bottom:10px; display:block;">` : '';
-  const sigHTML = data.signature ? `<img src="${data.signature}" style="max-height:60px; margin-bottom:4px; display:block; margin-left:auto;">` : `<div style="border-bottom:1px solid #0f172a; margin-bottom:4px; height:40px;"></div>`;
-  
-  let bankHTML = "";
-  if (data.bankName || data.bankAcc) {
-    bankHTML = `
-      <div style="margin-top:18px; font-size:0.85em; color:#475569;">
-        <strong style="color:#0f172a">Bank Details:</strong><br>
-        Bank: ${esc(data.bankName)}<br>
-        A/c No: ${esc(data.bankAcc)}<br>
-        IFSC: ${esc(data.bankIFSC)}
-      </div>`;
-  }
-
-  const paperSize = bizProfile.printSize || 'auto';
-  const isA5 = paperSize === 'A5'; 
-  const pWidth = isA5 ? '148mm' : '800px';
-  const pad = isA5 ? '20px' : '40px';
-  const pageRule = paperSize === 'auto' ? '@page { margin: 0.5cm; }' : `@page { size: ${paperSize}; margin: 0.5cm; }`;
-
-  let tplCSS = `${pageRule} .invoice-paper { max-width:${pWidth}; margin:0 auto; background:white; padding:${pad}; border:1px solid #eee; border-top: 6px solid #1e4a6e; } .inv-header { border-bottom: 3px solid #1e4a6e !important; } h1 { color: #1e4a6e !important; } th { background: #f1f5f9 !important; color: #1e4a6e !important; }`;
-  if (templateName === "tpl-minimal") tplCSS = `${pageRule} .invoice-paper { max-width:${pWidth}; margin:0 auto; background:white; padding:${pad}; border: 1px solid #eee; } .inv-header { border-bottom: 1px solid #ddd !important; padding-bottom: 20px; } th { background: transparent !important; border-bottom: 2px solid #333 !important; color: #333 !important; } .totals { border-top: 2px solid #333 !important; } h1 { color: #555 !important; }`;
-  else if (templateName === "tpl-bold") tplCSS = `${pageRule} .invoice-paper { max-width:${pWidth}; margin:0 auto; background:linear-gradient(to bottom, #ffffff, #fdf8f6); padding:${pad}; border-radius:16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-top: 8px solid #c2410c; } .inv-header { border-bottom: none !important; } h1 { color: #c2410c !important; } th { background: #c2410c !important; color: white !important; border: none !important; } .totals { background: #fff7ed; padding: 20px; border-radius: 12px; border: none !important; }`;
-
-  const autoPrintScript = isSample ? '' : `<script>window.onload=function(){setTimeout(()=>{window.print();window.close();},500);};</script>`;
-
-  return `<!DOCTYPE html>
-  <html>
-  <head><meta charset="UTF-8"><title>Invoice - ${esc(data.invNo)}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box;}
-    body{background:#f0f2f5; font-family:'Inter',sans-serif; padding:20px; color:#1a2c3e; font-size: ${isA5 ? '10pt' : '14pt'};}
-    table{width:100%; border-collapse:collapse; margin:18px 0;}
-    th,td{padding:${isA5 ? '8px 4px' : '12px 8px'}; text-align:left; border-bottom:1px solid #e2e8f0; font-size:0.85em;}
-    th{background:#f1f5f9; color:#475569; text-transform:uppercase; font-size:0.75em; letter-spacing:0.05em;}
-    .totals{text-align:right; margin-top:20px; border-top:1px dashed #cbd5e1; padding-top:16px;}
-    .footer{margin-top:25px; font-size:0.75em; text-align:center; color:#64748b;}
-    @media print { body { background:white; padding:0; font-size: ${isA5 ? '8.5pt' : '11pt'}; } .invoice-paper { width: 100% !important; max-width: 100% !important; box-shadow:none !important; border:none !important; padding:0 !important; margin:0 !important; } }
-    ${tplCSS}
-  </style>
-  </head>
-  <body>
-  <div class="invoice-paper">
-    <div class="inv-header" style="display:flex; justify-content:space-between; flex-wrap:wrap; padding-bottom:20px; margin-bottom:20px;">
-      <div>
-        ${logoHTML}
-        <h2 style="font-size:1.6em; color:#0f172a; margin-bottom:4px; font-weight:800;">${esc(data.bizName)}</h2>
-        <div style="font-size:0.8em; color:#475569; line-height:1.5;">${esc(data.bizAddr).replace(/\n/g,'<br>')}</div>
-        <div style="font-size:0.8em; color:#475569; margin-top:4px;">GSTIN: ${esc(data.bizGst)}</div>
-      </div>
-      <div style="text-align:right;">
-        <h1 style="color:#0f172a; letter-spacing:0.05em; font-size:2.2em">TAX INVOICE</h1>
-        <div style="font-size:0.85em; color:#64748b; margin-top:4px;">${data.gstType === 'Exclusive' ? 'GST Exclusive' : 'GST Inclusive'}</div>
-      </div>
-    </div>
-    
-    <div style="display:flex; justify-content:space-between; margin:12px 0; flex-wrap:wrap; background:#f8fafc; padding:16px; border-radius:12px; border:1px solid #e2e8f0; font-size:0.9em;">
-      <div style="width:50%">
-        <h4 style="font-size:0.85em; color:#64748b; text-transform:uppercase; margin-bottom:4px; letter-spacing:0.05em;">Billed To</h4>
-        <div style="font-weight:700; font-size:1.1em; color:#0f172a;">${esc(data.customerName)}</div>
-        <div style="color:#475569; margin-top:2px;">${esc(data.billingAddress).replace(/\n/g,'<br>')}</div>
-        ${data.placeOfSupply ? `<div style="color:#475569; margin-top:4px;"><strong>Place of Supply:</strong> ${data.placeOfSupply}</div>` : ''}
-      </div>
-      <div style="width:40%; text-align:right;">
-        <div style="margin-bottom:8px;"><strong>Invoice No:</strong> ${esc(data.invNo)}</div>
-        <div><strong>Date:</strong> ${dateLabel(data.invDate)}</div>
-      </div>
-    </div>
-    
-    <table>
-      <thead><tr><th style="text-align:center">#</th><th>Description</th><th>HSN/SAC</th><th style="text-align:center">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Taxable</th><th style="text-align:center">GST%</th><th style="text-align:right">GST Amt</th><th style="text-align:right">Total</th></tr></thead>
-      <tbody>${itemsRows}</tbody>
-    </table>
-    
-    <div class="totals">
-      <div style="color:#475569; margin-bottom:6px; font-size:0.9em;">Total Taxable: ${fmt(sub)}</div>
-      ${gstBreakdownHTML}
-      ${discountHTML}
-      <div style="font-size:1.4em; font-weight:800; color:#0f172a; margin-top:12px;">Grand Total: ${fmt(grand)}</div>
-    </div>
-    
-    <div style="margin-top:18px; padding-top:12px; border-top:1px dashed #cbd5e1; font-size:0.9em; color:#0f172a;">
-      <strong>Amount in Words:</strong><br>
-      <span style="text-transform: capitalize;">${numberToWords(grand)} Rupees Only</span>
-    </div>
-    ${bankHTML}
-    <div style="display:flex; justify-content:space-between; margin-top:20px; font-size:0.8em; border-top:1px solid #e2e8f0; padding-top:16px;">
-      <div style="width:60%">
-        <strong>Terms & Conditions:</strong><br>
-        <span style="color:#64748b">${esc(bizProfile.terms).replace(/\n/g, '<br>')}</span>
-      </div>
-      <div style="width:35%; text-align:right; display:flex; flex-direction:column; justify-content:flex-end;">
-        ${sigHTML}
-        <strong style="color:#0f172a;">Authorised Signatory</strong>
-        <div style="color:#475569; margin-top:2px;">For ${esc(data.bizName)}</div>
-      </div>
-    </div>
-    <div class="footer">Generated by BillingSuite Pro</div>
-  </div>
-  ${autoPrintScript}
-  </body>
-  </html>`;
-}
