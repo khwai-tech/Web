@@ -1,8 +1,30 @@
-// ─── TABS ─────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//        BILLINGSUITE PRO - CORE APPLICATION ENGINE (SUPABASE)
+// ══════════════════════════════════════════════════════════════
+
+const GST_STATE_CODES = {
+  "01": "Jammu and Kashmir", "02": "Himachal Pradesh", "03": "Punjab", "04": "Chandigarh",
+  "05": "Uttarakhand", "06": "Haryana", "07": "Delhi", "08": "Rajasthan", "09": "Uttar Pradesh",
+  "10": "Bihar", "11": "Sikkim", "12": "Arunachal Pradesh", "13": "Nagaland", "14": "Manipur",
+  "15": "Mizoram", "16": "Tripura", "17": "Meghalaya", "18": "Assam", "19": "West Bengal",
+  "20": "Jharkhand", "21": "Odisha", "22": "Chhattisgarh", "23": "Madhya Pradesh", "24": "Gujarat",
+  "25": "Daman and Diu", "26": "Dadra and Nagar Haveli", "27": "Maharashtra", "28": "Andhra Pradesh",
+  "29": "Karnataka", "30": "Goa", "31": "Lakshadweep", "32": "Kerala", "33": "Tamil Nadu",
+  "34": "Puducherry", "35": "Andaman and Nicobar Islands", "36": "Telangana", "37": "Andhra Pradesh",
+  "38": "Ladakh"
+};
+
+// ─── UI: TABS & NAVIGATION ──────────────────────────────
+// ─── UI: TABS & NAVIGATION (WITH MEMORY) ──────────────────────────────
+// ─── UI: TABS & NAVIGATION ──────────────────────────────
 function initTabs() {
   document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    btn.addEventListener('click', () => {
+      switchTab(btn.dataset.tab);
+      localStorage.setItem('bs_active_tab', btn.dataset.tab); // Save main tab
+    });
   });
+  
   document.querySelectorAll('.sec-tab[data-stab]').forEach(btn => {
     btn.addEventListener('click', () => {
       const parent = btn.closest('.tab-pane');
@@ -11,543 +33,487 @@ function initTabs() {
       parent.querySelectorAll('.stab-pane').forEach(p => p.style.display = 'none');
       const target = document.getElementById(btn.dataset.stab);
       if (target) target.style.display = 'block';
+      localStorage.setItem('bs_active_stab_' + parent.id, btn.dataset.stab); // Save sub-tab
     });
   });
-}
 
-// ─── GST STATE CODES ─────────────────────────────────────
-const GST_STATE_CODES = {
-  "01": "Jammu and Kashmir", "02": "Himachal Pradesh", "03": "Punjab", "04": "Chandigarh",
-  "05": "Uttarakhand", "06": "Haryana", "07": "Delhi", "08": "Rajasthan", "09": "Uttar Pradesh",
-  "10": "Bihar", "11": "Sikkim", "12": "Arunachal Pradesh", "13": "Nagaland", "14": "Manipur",
-  "15": "Mizoram", "16": "Tripura", "17": "Meghalaya", "18": "Assam", "19": "West Bengal",
-  "20": "Jharkhand", "21": "Odisha", "22": "Chhattisgarh", "23": "Madhya Pradesh", "24": "Gujarat",
-  "26": "Dadra and Nagar Haveli and Daman and Diu", "27": "Maharashtra", "28": "Andhra Pradesh",
-  "29": "Karnataka", "30": "Goa", "31": "Lakshadweep", "32": "Kerala", "33": "Tamil Nadu",
-  "34": "Puducherry", "35": "Andaman and Nicobar Islands", "36": "Telangana", "38": "Ladakh"
-};
+  // 1. Immediately jump to the saved tab (or default to dashboard)
+  const savedTab = localStorage.getItem('bs_active_tab') || 'dashboard';
+  switchTab(savedTab);
 
-function buildStateDropdown() {
-  const select = document.getElementById("state-list");
-  if (!select) return;
-
-  // 1. Wipe it clean so we don't accidentally duplicate the list
-  select.innerHTML = '<option value="">--Select State--</option>';
-
-  // 2. Build the list of states
-  Object.entries(GST_STATE_CODES).sort((a, b) => a[1].localeCompare(b[1])).forEach(([code, name]) => {
-      let option = document.createElement("option");
-      option.value = code;
-      option.text = `${name} (${code})`; // Added the GST code to the text for better UI!
-      select.appendChild(option);
-  });
-
-  // ⚡ 3. CRITICAL FIX: Force it to select your saved state right NOW
-  if (typeof bizProfile !== 'undefined' && bizProfile.state) {
-      select.value = bizProfile.state;
-  }
-}
-
-function switchTab(tab) {
-  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-  const btn = document.querySelector(`.nav-item[data-tab="${tab}"]`);
-  if (btn) btn.classList.add('active');
-  
-  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-  const pane = document.getElementById(tab + 'Pane');
-  if (pane) pane.classList.add('active');
-  
-  if (tab === 'inventory') refreshInventory();
-  if (tab === 'products')  renderProductGrid();
-  if (tab === 'report')    buildReports();
-  if (tab === 'customers') renderCustomerGrid();
-  if (tab === 'suppliers') renderSupplierGrid();
-  
-  document.getElementById('sidebar').classList.remove('open');
-  
-  // 👇 FIX: Changed tabId to tab
-  localStorage.setItem('bs_active_tab', tab); 
-}
-
-// ─── DATE SETUP ───────────────────────────────
-function setupDates() {
-  const d = today();
-  ['invDate','purchaseDate'].forEach(id => { const el = document.getElementById(id); if (el) el.value = d; });
-  const dashDate = document.getElementById('dashDate');
-  if (dashDate) dashDate.textContent = 'Today, ' + new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-}
-
-// ─── DASHBOARD PERIOD FILTER ──────────────────
-let dashPeriod = 'all'; // 'day' | 'week' | 'month' | 'all'
-
-function setDashPeriod(period, el) {
-  dashPeriod = period;
-  document.querySelectorAll('.dash-period-btn').forEach(b => b.classList.remove('active'));
-  if (el) el.classList.add('active');
-  updateDashboard();
-}
-
-function _filterDashArray(arr, dateKey) {
-  if (dashPeriod === 'all') return arr;
-  const now = new Date();
-  return arr.filter(item => {
-    const d = item[dateKey] || (item.timestamp || '').slice(0, 10);
-    if (!d) return false;
-    const itemDate = new Date(d);
-    if (dashPeriod === 'day') {
-      return itemDate.toDateString() === now.toDateString();
-    } else if (dashPeriod === 'week') {
-      const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
-      return itemDate >= weekAgo;
-    } else if (dashPeriod === 'month') {
-      return itemDate.getFullYear() === now.getFullYear() && itemDate.getMonth() === now.getMonth();
+  // 2. Restore Sub-Tabs quietly
+  document.querySelectorAll('.tab-pane').forEach(pane => {
+    const savedStab = localStorage.getItem('bs_active_stab_' + pane.id);
+    if (savedStab) {
+      const stabBtn = pane.querySelector(`.sec-tab[data-stab="${savedStab}"]`);
+      if (stabBtn) stabBtn.click();
     }
-    return true;
   });
 }
 
-// ─── DASHBOARD UPDATE ─────────────────────────
-function updateDashboard() {
-  const filtInv = _filterDashArray(invoicesArray,  'date');
-  const filtPur = _filterDashArray(purchasesArray, 'date');
-
-  const totalRevenue   = filtInv.reduce((s, i) => s + (i.grandTotal  || 0), 0);
-  const totalPurchases = filtPur.reduce((s, p) => s + (p.totalAmount || 0), 0);
-
-  const el = id => document.getElementById(id);
-  if (el('dashTotalRevenue'))   el('dashTotalRevenue').textContent   = fmt(totalRevenue);
-  if (el('dashTotalPurchases')) el('dashTotalPurchases').textContent = fmt(totalPurchases);
-  if (el('dashInvCount'))       el('dashInvCount').textContent       = filtInv.length;
-
-  // Period label on stat cards
-  const labels = { day: 'Today', week: 'This Week', month: 'This Month', all: 'All Time' };
-  const lab = labels[dashPeriod] || 'All Time';
-  if (el('dashRevLabel'))   el('dashRevLabel').textContent   = lab;
-  if (el('dashPurLabel'))   el('dashPurLabel').textContent   = lab;
-  if (el('dashInvLabel'))   el('dashInvLabel').textContent   = lab;
-
-  generateTopProducts();
-}
-
-function generateTopProducts() {
-  const sales = {};
-  invoicesArray.forEach(inv => (inv.items || []).forEach(it => {
-    sales[it.description] = (sales[it.description] || 0) + (parseFloat(it.quantity) || 0);
-  }));
-  const sorted = Object.entries(sales).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const html = sorted.length
-    ? sorted.map(([name, qty], i) => `
-        <div class="list-item">
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="width:28px;height:28px;background:var(--accent-light);color:var(--accent2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem">${i + 1}</div>
-            <div class="list-item-title">${esc(name)}</div>
-          </div>
-          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9rem">${qty} units</div>
-        </div>`).join('')
-    : '<div class="empty-state"><i class="fas fa-chart-bar"></i><p>No sales data yet</p></div>';
-  ['dashTopProducts','reportTopSellingList'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = html; });
-}
-
-// ─── REPORT DATE RANGE ────────────────────────
-function setReportRange(type, btn) {
-  const now = new Date(), y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
-  document.querySelectorAll('.date-filter-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  if      (type === 'day')     { reportRange = { from: today(), to: today() }; }
-  else if (type === 'week')    { const s = new Date(y, m, d - now.getDay()); reportRange = { from: s.toISOString().slice(0, 10), to: today() }; }
-  else if (type === 'month')   { reportRange = { from: new Date(y, m, 1).toISOString().slice(0, 10), to: today() }; }
-  else if (type === 'quarter') { const qm = Math.floor(m / 3) * 3; reportRange = { from: new Date(y, qm, 1).toISOString().slice(0, 10), to: today() }; }
-  else if (type === 'all')     { reportRange = { from: null, to: null }; }
-  else if (type === 'custom')  {
-    reportRange = { from: document.getElementById('reportFrom').value, to: document.getElementById('reportTo').value };
-    document.querySelectorAll('.date-filter-btn').forEach(b => b.classList.remove('active'));
-  }
-  buildReports();
-}
-
-function filterByRange(arr) {
-  if (!reportRange.from && !reportRange.to) return arr;
-  return arr.filter(item => {
-    const d = item.date || (item.timestamp || '').slice(0, 10);
-    if (!d) return true;
-    if (reportRange.from && d < reportRange.from) return false;
-    if (reportRange.to   && d > reportRange.to)   return false;
-    return true;
-  });
-}
-
-function groupByMonth(arr, amtKey) {
-  const m = {};
-  arr.forEach(item => {
-    const d = item.date || (item.timestamp || '').slice(0, 10);
-    if (!d) return;
-    const key = new Date(d).toLocaleString('en-IN', { month: 'short', year: 'numeric' });
-    m[key] = (m[key] || 0) + (item[amtKey] || 0);
-  });
-  return m;
-}
-
-// ─── REPORTS ──────────────────────────────────
-function buildReports() {
-  generateTopProducts();
-
-  const filtInv = filterByRange(invoicesArray);
-  const filtPur = filterByRange(purchasesArray);
-
-  // ── Core metrics
-  const totalSalesRevenue = filtInv.reduce((s, i) => s + (i.grandTotal  || 0), 0);
-  const totalPurchases    = filtPur.reduce((s, p) => s + (p.totalAmount || 0), 0);
-  const gstCollected      = filtInv.reduce((s, i) => s + (i.gstAmount   || 0), 0);
-  const gstPaid           = filtPur.reduce((s, p) => s + (p.gstAmount   || 0), 0);
-  const salesExGST        = filtInv.reduce((s, i) => s + (i.subtotal    || 0), 0);
-  const profit            = totalSalesRevenue - totalPurchases;
-  const totalLoss         = profit < 0 ? Math.abs(profit) : 0;
-  const totalProfit       = profit > 0 ? profit : 0;
-
-  const el = id => document.getElementById(id);
-
-  // ── Row 1: Sales Revenue, Total Sales, Total Purchase, Profit, Loss
-  if (el('repSalesRevenue'))    el('repSalesRevenue').textContent    = fmt(salesExGST);
-  if (el('repTotalSales'))      el('repTotalSales').textContent      = fmt(totalSalesRevenue);
-  if (el('repTotalPurchases'))  el('repTotalPurchases').textContent  = fmt(totalPurchases);
-  if (el('repProfit'))          el('repProfit').textContent          = fmt(totalProfit);
-  if (el('repLoss'))            el('repLoss').textContent            = fmt(totalLoss);
-
-  // Colour profit/loss box dynamically
-  const profitBox = document.getElementById('repProfitBox');
-  const lossBox   = document.getElementById('repLossBox');
-  if (profitBox) profitBox.style.borderColor = profit >= 0 ? 'var(--accent2)' : 'transparent';
-  if (lossBox)   lossBox.style.borderColor   = profit <  0 ? 'var(--danger)'  : 'transparent';
-
-  // ── Row 2: GST KPIs
-  if (el('repGSTCollected')) el('repGSTCollected').textContent = fmt(gstCollected);
-  if (el('repGSTPaid'))      el('repGSTPaid').textContent      = fmt(gstPaid);
-  if (el('repGSTNet'))       el('repGSTNet').textContent       = fmt(gstCollected - gstPaid);
-  if (el('repInvCount'))     el('repInvCount').textContent     = filtInv.length;
-
-  // ── GST Summary table
-  const isInter = bizProfile.supplyType === 'inter';
-  if (el('gCGSTLabel')) el('gCGSTLabel').textContent = isInter ? 'IGST (100%)' : 'CGST (50%)';
-  if (el('gSGSTLabel')) el('gSGSTLabel').textContent = isInter ? '—'           : 'SGST (50%)';
-  const cgstColl = isInter ? gstCollected : gstCollected / 2;
-  const sgstColl = isInter ? 0            : gstCollected / 2;
-  const cgstPaid = isInter ? gstPaid      : gstPaid / 2;
-  const sgstPaid = isInter ? 0            : gstPaid / 2;
-  if (el('gCGSTColl')) el('gCGSTColl').textContent = fmt(cgstColl);
-  if (el('gCGSTPaid')) el('gCGSTPaid').textContent = fmt(cgstPaid);
-  if (el('gCGSTNet'))  el('gCGSTNet').textContent  = fmt(cgstColl - cgstPaid);
-  if (el('gSGSTColl')) el('gSGSTColl').textContent = fmt(sgstColl);
-  if (el('gSGSTPaid')) el('gSGSTPaid').textContent = fmt(sgstPaid);
-  if (el('gSGSTNet'))  el('gSGSTNet').textContent  = fmt(sgstColl - sgstPaid);
-  if (el('gTotalColl')) el('gTotalColl').textContent = fmt(gstCollected);
-  if (el('gTotalPaid')) el('gTotalPaid').textContent = fmt(gstPaid);
-  if (el('gTotalNet'))  el('gTotalNet').textContent  = fmt(gstCollected - gstPaid);
-
-  // ── GST rate slab breakdown
-  const rateMap = {};
-  filtInv.forEach(inv => (inv.items || []).forEach(it => {
-    const r = ((it.gstRate || 0) * 100).toFixed(0) + '%';
-    rateMap[r] = (rateMap[r] || 0) + (parseFloat(it.quantity) * parseFloat(it.unitPrice) * (it.gstRate || 0));
-  }));
-  const rateEl = el('gstRateBreakdown');
-  if (rateEl) {
-    rateEl.innerHTML = `<p style="font-size:0.8rem;color:var(--ink3);margin-bottom:12px">GST collected by rate slab:</p>` +
-      (Object.entries(rateMap).map(([r, v]) =>
-        `<div style="display:flex;justify-content:space-between;font-size:0.875rem;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-weight:600">${r}</span><span style="color:var(--accent)">${fmt(v)}</span></div>`
-      ).join('') || '<p style="color:var(--ink3);font-size:0.85rem">No GST data in range</p>');
-  }
-
-  // ── Charts
-  const invByMonth = groupByMonth(filtInv, 'grandTotal');
-  const purByMonth = groupByMonth(filtPur, 'totalAmount');
-  const allMonths  = [...new Set([...Object.keys(invByMonth), ...Object.keys(purByMonth)])];
-  if (!allMonths.length) allMonths.push('No Data');
-
-  const salesData  = allMonths.map(m => invByMonth[m] || 0);
-  const purData    = allMonths.map(m => purByMonth[m] || 0);
-  const profitData = allMonths.map(m => (invByMonth[m] || 0) - (purByMonth[m] || 0));
-
-  const ctxSales  = el('reportSalesChart')?.getContext('2d');
-  const ctxProfit = el('reportProfitChart')?.getContext('2d');
-  const ctxPie    = el('reportPieChart')?.getContext('2d');
-
-  if (App.chartSales)  { App.chartSales.destroy();  App.chartSales  = null; }
-  if (App.chartProfit) { App.chartProfit.destroy();  App.chartProfit = null; }
-  if (App.chartPie)    { App.chartPie.destroy();     App.chartPie    = null; }
-
-  const tickFmt   = v => '₹' + v.toLocaleString('en-IN');
-  const gridColor = 'rgba(0,0,0,0.04)';
-
-  if (ctxSales) {
-    App.chartSales = new Chart(ctxSales, {
-      type: 'bar',
-      data: { labels: allMonths, datasets: [
-        { label: 'Sales (₹)',     data: salesData, backgroundColor: '#1a4a3a', borderRadius: 6 },
-        { label: 'Purchases (₹)', data: purData,   backgroundColor: '#c8933a', borderRadius: 6 }
-      ]},
-      options: { responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: 'top' } },
-        scales: { y: { ticks: { callback: tickFmt }, grid: { color: gridColor } }, x: { grid: { display: false } } } }
-    });
-  }
-
-  if (ctxProfit) {
-    App.chartProfit = new Chart(ctxProfit, {
-      type: 'line',
-      data: { labels: allMonths, datasets: [
-        { label: 'Profit (₹)', data: profitData,
-          borderColor: '#2d7a62', backgroundColor: 'rgba(45,122,98,0.1)',
-          fill: true, tension: 0.4, pointBackgroundColor: '#2d7a62', borderWidth: 2.5 }
-      ]},
-      options: { responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: 'top' } },
-        scales: { y: { ticks: { callback: tickFmt }, grid: { color: gridColor } }, x: { grid: { display: false } } } }
-    });
-  }
-
-  if (ctxPie) {
-    const totalInv = inventoryStock.reduce((s, p) => s + (p.stock || 0) * (p.sellPrice || p.costPrice || 0), 0);
-    App.chartPie = new Chart(ctxPie, {
-      type: 'doughnut',
-      data: { labels: ['Revenue', 'Purchases', 'Stock Value'],
-        datasets: [{ data: [totalSalesRevenue || 0.1, totalPurchases || 0.1, totalInv || 0.1],
-          backgroundColor: ['#1a4a3a', '#c8933a', '#2d7a62'], borderWidth: 0, hoverOffset: 8 }] },
-      options: { responsive: true, maintainAspectRatio: false, cutout: '65%',
-        plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: ctx => ` ${fmt(ctx.parsed)}` } } } }
-    });
-  }
-}
-
-// ─── GLOBAL SEARCH ────────────────────────────
-function doGlobalSearch() {
-  const q    = document.getElementById('globalSearchInput').value.trim().toLowerCase();
-  const drop = document.getElementById('globalSearchDrop');
-  if (!q) { drop.classList.remove('open'); return; }
-  const results = [];
-  invoicesArray.filter(i  => i.invoiceId.toLowerCase().includes(q)  || i.customerName.toLowerCase().includes(q) || String(i.grandTotal||'').includes(q) || (i.date||'').includes(q)).slice(0, 3).forEach(i  => results.push({ label: `${i.invoiceId} — ${i.customerName}`,  tag: 'Invoice',  action: () => { switchTab('invoice');  showInvoiceDetail(i.invoiceId); } }));
-  purchasesArray.filter(p => p.poNumber.toLowerCase().includes(q)   || p.supplier.toLowerCase().includes(q)).slice(0, 3).forEach(p  => results.push({ label: `${p.poNumber} — ${p.supplier}`,          tag: 'Purchase', action: () => { switchTab('purchase'); showPurchaseDetail(p.poNumber); } }));
-  inventoryStock.filter(p => (p.name||'').toLowerCase().includes(q) || (p.id||'').toLowerCase().includes(q)).slice(0, 3).forEach(p => results.push({ label: `${p.name} (${p.id})`,                     tag: 'Product',  action: () => { switchTab('products'); } }));
-  customersArray.filter(c => (c.name||'').toLowerCase().includes(q)).slice(0, 2).forEach(c => results.push({ label: c.name,                                                                                   tag: 'Customer', action: () => { switchTab('customers'); } }));
-
-  if (!results.length) { drop.innerHTML = '<div class="sr-item" style="color:var(--ink3)">No results found</div>'; drop.classList.add('open'); return; }
-  drop.innerHTML = results.map((r, idx) => `<div class="sr-item" data-idx="${idx}"><div class="sr-item-tag">${r.tag}</div>${esc(r.label)}</div>`).join('');
-  drop.classList.add('open');
-  drop.querySelectorAll('.sr-item[data-idx]').forEach(item => {
-    item.addEventListener('click', () => { results[+item.dataset.idx].action(); drop.classList.remove('open'); document.getElementById('globalSearchInput').value = ''; });
-  });
-}
-document.addEventListener('click', e => { if (!e.target.closest('.global-search-wrap')) { const d = document.getElementById('globalSearchDrop'); if (d) d.classList.remove('open'); } });
-
-// ─── KEYBOARD SHORTCUTS ───────────────────────
-document.addEventListener('keydown', e => {
-  const tag = document.activeElement?.tagName;
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-  const hint = document.getElementById('kbHint');
-  const showHint = msg => { if (hint) { hint.textContent = msg; hint.style.display = 'block'; setTimeout(() => hint.style.display = 'none', 1600); } };
-  if ((e.ctrlKey || e.metaKey) && e.key === 'n') { e.preventDefault(); switchTab('invoice');  showHint('⌃N — New Invoice'); }
-  if ((e.ctrlKey || e.metaKey) && e.key === 'p') { e.preventDefault(); switchTab('purchase'); showHint('⌃P — New Purchase'); }
-  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-    e.preventDefault();
-    const active = document.querySelector('.tab-pane.active');
-    if (active?.id === 'invoicePane')  saveInvoice();
-    if (active?.id === 'purchasePane') savePurchase();
-    showHint('⌃S — Saved');
-  }
-  if (e.key === 'Escape') closeModal();
-  if (e.key === '/' && !e.ctrlKey) { e.preventDefault(); document.getElementById('globalSearchInput')?.focus(); }
-});
-
-// ─── AUTO-FILLS ───────────────────────────────
-function initSupplierAutoFill() {
-  const suppInput = document.getElementById('supplierName');
-  if (!suppInput) return;
-  suppInput.addEventListener('change', () => {
-    const name  = suppInput.value.trim();
-    const match = suppliersArray.find(s => s.name.toLowerCase() === name.toLowerCase());
-    if (match) toast(`Supplier: ${esc(match.name)}${match.paymentTerms ? ' · ' + match.paymentTerms : ''}`, 'success');
-  });
-}
-
-// ─── AUTO-FILLS ───────────────────────────────
-function initCustomerAutoFill() {
-  const custInput = document.getElementById('customerName');
-  const gstinInput = document.getElementById('customerGstin');
-
-  // 1. Auto-fill when selecting a saved customer
-  if (custInput) {
-    custInput.addEventListener('change', () => {
-      const name  = custInput.value.trim();
-      const match = customersArray.find(c => c.name.toLowerCase() === name.toLowerCase());
-      if (match) {
-        const emailEl = document.getElementById('customerEmail');
-        const addrEl  = document.getElementById('billingAddr');
-        if (emailEl && match.email)   emailEl.value = match.email;
-        if (addrEl  && match.address) addrEl.value  = match.address;
-        if (gstinInput && match.gstin) gstinInput.value = match.gstin;
-
-        // ⚡ FIRE THE TAX ENGINE ⚡
-        App.currentInvoiceSupplyType = getSmartSupplyType(match.gstin);
-        if (typeof calcInvoiceTotals === 'function') calcInvoiceTotals();
-        
-        toast(`Loaded details for ${esc(match.name)}`, 'success');
-      }
-    });
-  }
-
-  // 2. Auto-switch tax if user manually types/changes the GSTIN
-  if (gstinInput) {
-    gstinInput.addEventListener('change', () => {
-      App.currentInvoiceSupplyType = getSmartSupplyType(gstinInput.value);
-      if (typeof calcInvoiceTotals === 'function') calcInvoiceTotals();
-      
-      const typeLabel = App.currentInvoiceSupplyType === 'inter' ? 'IGST' : 'CGST & SGST';
-      toast(`Tax switched to ${typeLabel}`, 'info');
-    });
-  }
-}
-
-// ─── INIT ─────────────────────────────────────
-function init() {
-  const lastTab = localStorage.getItem('bs_active_tab') || 'dashboard';
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   
+  const targetPane = document.getElementById(tabId + 'Pane');
+  const targetBtn = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
+  
+  if (targetPane) targetPane.style.display = 'block';
+  if (targetBtn) targetBtn.classList.add('active');
+}
+
+function closeModal() {
+  // Finds ALL modals and completely clears any stuck inline styles
+  document.querySelectorAll('.modal-overlay').forEach(modal => {
+    modal.classList.remove('open');
+    modal.style.display = ''; 
+  });
+}
+
+function closeSampleModal() {
+  const m = document.getElementById('sampleModal');
+  if (m) {
+    m.classList.remove('open');
+    m.style.display = '';
+  }
+}
+function toast(msg, type = 'info') {
+  const existing = document.getElementById('toastMsg');
+  if (existing) existing.remove();
+  
+  const t = document.createElement('div');
+  t.id = 'toastMsg';
+  t.textContent = msg;
+  
+  let bg = '#1a5276'; 
+  if (type === 'success') bg = '#1a4a3a'; 
+  if (type === 'error' || type === 'warn') bg = '#c0392b'; 
+  
+  t.style.cssText = `position:fixed; bottom:20px; right:20px; background:${bg}; color:#fff; padding:12px 24px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:9999; font-family:'DM Sans', sans-serif; font-weight:500; font-size:0.9rem; animation: slideUp 0.3s ease;`;
+  
+  document.body.appendChild(t);
+  setTimeout(() => {
+    t.style.animation = 'fadeOut 0.3s ease forwards';
+    setTimeout(() => t.remove(), 300);
+  }, 3000);
+}
+
+// ─── STORE SWITCHER FUNCTION ──────────────────────────────
+function changeActiveStore() {
+  const newStore = document.getElementById('settingStoreSelect').value;
+  if (newStore === currentStoreId) {
+    toast('This store is already active.', 'info');
+    return;
+  }
+  localStorage.setItem('bs_active_store', newStore); 
+  loadSupabaseData(); 
+}
+
+// ─── SUPABASE MULTI-STORE SYNC ENGINE ───────────────────
+async function loadSupabaseData() {
+  currentStoreId = localStorage.getItem('bs_active_store') || 'Store 1';
+  
+  const storeDropdown = document.getElementById('settingStoreSelect');
+  if (storeDropdown) storeDropdown.value = currentStoreId;
+  
+  const led = document.getElementById('statusLed');
+  const statusLabel = document.getElementById('apiStatusLabel');
+  if (led) led.className = 'led';
+  if (statusLabel) statusLabel.textContent = 'Syncing...';
+
   try {
-    switchTab(lastTab);
-  } catch (err) {}
+    // Fetch all 7 tables
+    const [invRes, custRes, suppRes, invcRes, purRes, expRes, settRes, allStoresRes] = await Promise.all([
+      supabase.from('inventory').select('*').eq('store_id', currentStoreId),
+      supabase.from('customers').select('*').eq('store_id', currentStoreId),
+      supabase.from('suppliers').select('*').eq('store_id', currentStoreId),
+      supabase.from('invoices').select('*').eq('store_id', currentStoreId).order('created_at', { ascending: false }),
+      supabase.from('purchases').select('*').eq('store_id', currentStoreId).order('created_at', { ascending: false }),
+      supabase.from('expenses').select('*').eq('store_id', currentStoreId).order('date', { ascending: false }),
+      supabase.from('store_settings').select('*').eq('store_id', currentStoreId).single(),
+      supabase.from('store_settings').select('store_id, profile_data') 
+    ]);
 
-  loadTheme();
-  setupDates();
-  loadSettingsPreviews();
+    // Update the Dropdown Labels to show custom Store Names
+    if (allStoresRes && allStoresRes.data && storeDropdown) {
+      Array.from(storeDropdown.options).forEach(opt => {
+        const sData = allStoresRes.data.find(s => s.store_id === opt.value);
+        if (sData && sData.profile_data && sData.profile_data.storeAlias) {
+          opt.text = `${opt.value} — ${sData.profile_data.storeAlias}`;
+        } else {
+          opt.text = opt.value; 
+        }
+      });
+    }
 
-  // 👇 ADD THIS LINE: Build the dropdown and apply the saved state
-  if (typeof buildStateDropdown === 'function') buildStateDropdown();
+    // Inject Cloud Settings into UI
+    if (settRes.data && settRes.data.profile_data) {
+      bizProfile = settRes.data.profile_data;
+    } else {
+      bizProfile = {}; 
+    }
+    if (typeof populateSettingsUI === 'function') populateSettingsUI();
 
-  loadSettings();
+    // Map SQL to JS (inventory and suppliers still use snake_case)
+    inventoryStock.length = 0; if (invRes.data) inventoryStock.push(...invRes.data.map(p => ({ ...p, costPrice: p.cost_price, sellPrice: p.sell_price, gstRate: p.gst_rate })));
+    suppliersArray.length = 0; if (suppRes.data) suppliersArray.push(...suppRes.data.map(s => ({ ...s, paymentTerms: s.payment_terms })));
+    expensesArray.length = 0;  if (expRes.data) expensesArray.push(...expRes.data.map(e => ({ ...e, desc: e.desc_text })));
+    customersArray.length = 0; if (custRes.data) customersArray.push(...custRes.data);
+    
+    // Invoices and Purchases map perfectly now thanks to your DB changes!
+    invoicesArray.length = 0;  if (invcRes.data) invoicesArray.push(...invcRes.data);
+    purchasesArray.length = 0; if (purRes.data) purchasesArray.push(...purRes.data);
 
-    invoicesArray.length  = 0; invoicesArray.push(...JSON.parse(localStorage.getItem('bs_invoices')  || '[]'));
-  purchasesArray.length = 0; purchasesArray.push(...JSON.parse(localStorage.getItem('bs_purchases') || '[]'));
+    if (statusLabel) statusLabel.textContent = 'Supabase Connected';
+    const lastSyncLabel = document.getElementById('apiLastSync');
+    if (lastSyncLabel) lastSyncLabel.textContent = 'Store: ' + currentStoreId;
+    
+    if (typeof updateDatalists === 'function') updateDatalists();
+    if (typeof renderInventoryTable === 'function') renderInventoryTable();
+    if (typeof renderProductGrid === 'function') renderProductGrid();
+    if (typeof renderCustomerGrid === 'function') renderCustomerGrid();
+    if (typeof renderSupplierGrid === 'function') renderSupplierGrid();
+    if (typeof renderInvoiceLists === 'function') renderInvoiceLists();
+    if (typeof renderPurchaseLists === 'function') renderPurchaseLists();
+    if (typeof renderExpenses === 'function') renderExpenses();
+    if (typeof updateDashboard === 'function') updateDashboard();
 
-  renderInvoiceEditor();
-  renderPurchaseEditor();
-  renderInvoiceLists();
-  renderPurchaseLists();
-  updateDashboard();
-  initTabs();
-  initCustomerAutoFill();
-  initSupplierAutoFill();
-
-  const invEl = document.getElementById('invNumber');
-  const poEl  = document.getElementById('poNumber');
-  if (invEl) invEl.value = getNextId(invoicesArray,  'INV');
-  if (poEl)  poEl.value  = getNextId(purchasesArray, 'PO');
-
-  setReportRange('all', document.querySelector('.date-filter-btn[onclick*="\'all\'"]'));
-
-  const expBtn = document.getElementById('backupExportBtn');
-  if (expBtn) expBtn.addEventListener('click', exportBackup);
-  const impInp = document.getElementById('backupImportInput');
-  if (impInp) impInp.addEventListener('change', () => importBackup(impInp));
-
-  document.getElementById('addInvoiceItemBtn')?.addEventListener('click', () => { invLineItems.push({ desc: '', qty: 1, price: 0, gstRate: 0.18 }); renderInvoiceEditor(); });
-  document.getElementById('saveInvoiceBtn')?.addEventListener('click', saveInvoice);
-  document.getElementById('clearInvoiceFormBtn')?.addEventListener('click', () => clearInvoiceForm());
-  document.getElementById('addPurchaseItemBtn')?.addEventListener('click', () => { purLineItems.push({ desc: '', qty: 1, cost: 0, gstRate: 0.18 }); renderPurchaseEditor(); });
-  document.getElementById('savePurchaseBtn')?.addEventListener('click', savePurchase);
-  document.getElementById('refreshInventoryBtn')?.addEventListener('click', refreshInventory);
-  document.getElementById('refreshInvoiceHistoryBtn')?.addEventListener('click', () => { renderInvoiceLists(); toast('Invoices refreshed'); });
-  document.getElementById('refreshPurchaseHistoryBtn')?.addEventListener('click', () => { renderPurchaseLists(); toast('Purchases refreshed'); });
-  document.getElementById('mobileMenuBtn')?.addEventListener('click', () => document.getElementById('sidebar').classList.toggle('open'));
-
-  fetchDatabaseContacts();
-
-  fetchInventoryAndReports();
+  } catch (error) {
+    console.error("Supabase Sync Error:", error);
+    if (led) led.className = 'led error';
+    if (statusLabel) statusLabel.textContent = 'Offline';
+    toast('Failed to sync with Supabase.', 'error');
+  }
 }
 
-document.addEventListener('DOMContentLoaded', init);
+// ══════════════════════════════════════════════════════════════
+//        GLOBAL UTILITY & HELPER FUNCTIONS
+// ══════════════════════════════════════════════════════════════
 
-
-
-// ─── FETCH CONTACTS FROM DATABASE ────────────────────────────
-function fetchDatabaseContacts() {
-  toast('Loading customers & suppliers...', 'info');
-  
-  // Calls the doGet() function in your Google Apps Script
-  fetch(API_URL)
-    .then(response => response.json())
-    .then(data => {
-      
-      // 1. Parse Customers (Skipping row 0 because it's the Header row)
-      if (data.customers && data.customers.length > 1) {
-        customersArray.length = 0; // Clear the temporary local array
-        const custRows = data.customers.slice(1);
-        
-        custRows.forEach(row => {
-          if (row[0]) { // Check if ID exists
-            customersArray.push({
-              id: row[0],
-              name: row[1] || '',
-              email: row[2] || '',
-              phone: row[3] || '',
-              address: row[4] || '',
-              gstin: row[5] || ''
-            });
-          }
-        });
-      }
-
-      // 2. Parse Suppliers (Skipping row 0)
-      if (data.suppliers && data.suppliers.length > 1) {
-        suppliersArray.length = 0; // Clear the temporary local array
-        const suppRows = data.suppliers.slice(1);
-        
-        suppRows.forEach(row => {
-          if (row[0]) {
-            suppliersArray.push({
-              id: row[0],
-              name: row[1] || '',
-              phone: row[2] || '',
-              address: row[3] || '',
-              paymentTerms: row[4] || '',
-              gstin: row[5] || ''
-            });
-          }
-        });
-      }
-
-      // 3. Update the UI with the fresh data
-      if (typeof renderCustomerGrid === 'function') renderCustomerGrid();
-      if (typeof renderSupplierGrid === 'function') renderSupplierGrid();
-      if (typeof updateDatalists === 'function') updateDatalists();
-      
-      toast('Contacts synced from database!', 'success');
-    })
-    .catch(err => {
-      console.error("Database Sync Error:", err);
-      toast('Failed to fetch from database. Using local data.', 'error');
-    });
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return str.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ─── NUMBER TO WORDS CONVERTER (Indian System) ────────────
+function fmt(num) {
+  return parseFloat(num || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function today() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function dateLabel(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function calcGST(amount, rate, type) {
+  const gstRate = parseFloat(rate) || 0;
+  let gst = 0, subtotalPart = 0, total = 0;
+  if (type === 'Inclusive') {
+    total = amount;
+    subtotalPart = total / (1 + gstRate);
+    gst = total - subtotalPart;
+  } else {
+    subtotalPart = amount;
+    gst = amount * gstRate;
+    total = amount + gst;
+  }
+  return { gst, subtotalPart, total };
+}
+
 function numberToWords(num) {
-  if (num === 0) return "Zero";
-  const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
-  const b = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
-  
+  if (!num || num === 0) return "Zero";
+  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
   function inWords(n) {
     let str = "";
     if (n > 9999999) { str += inWords(Math.floor(n / 10000000)) + " Crore "; n %= 10000000; }
     if (n > 99999)   { str += inWords(Math.floor(n / 100000)) + " Lakh "; n %= 100000; }
     if (n > 999)     { str += inWords(Math.floor(n / 1000)) + " Thousand "; n %= 1000; }
-    if (n > 99)      { str += a[Math.floor(n / 100)] + " Hundred "; n %= 100; }
-    if (n > 0) {
-      if (str !== "") str += "and ";
-      if (n < 20) str += a[n];
-      else {
-        str += b[Math.floor(n / 10)];
-        if (n % 10 > 0) str += " " + a[n % 10];
-      }
-    }
-    return str;
+    if (n > 99)      { str += inWords(Math.floor(n / 100)) + " Hundred "; n %= 100; }
+    if (n > 19)      { str += tens[Math.floor(n / 10)] + " "; n %= 10; }
+    if (n > 0)       { str += ones[n] + " "; }
+    return str.trim();
   }
-  return inWords(Math.round(num)).trim();
+  const integerPart = Math.floor(num);
+  const decimalPart = Math.round((num - integerPart) * 100);
+  let result = inWords(integerPart);
+  if (decimalPart > 0) result += " and " + inWords(decimalPart) + " Paisa";
+  return result;
 }
 
+// ─── ID GENERATORS ───
+function getNextId(type) {
+  let arr, key, prefix;
+  
+  if (type === 'invoice') {
+    arr = invoicesArray; key = 'invoiceId'; prefix = bizProfile.invPrefix || 'INV-';
+  } else if (type === 'purchase') {
+    arr = purchasesArray; key = 'poNumber'; prefix = bizProfile.poPrefix || 'PO-';
+  } else if (type === 'product') {
+    arr = inventoryStock; key = 'id'; prefix = 'ITM-';
+  }
+  
+  // Ensure the prefix ends cleanly with a dash if the user didn't type one
+  const pfx = prefix.endsWith('-') ? prefix : prefix + '-';
+  
+  if (!arr || arr.length === 0) return pfx + '001';
+  
+  let max = 0;
+  arr.forEach(obj => {
+    const str = String(obj[key] || '');
+    const match = str.match(/\d+$/); // Grabs the number at the very end
+    if (match) {
+      const num = parseInt(match[0], 10);
+      if (num > max) max = num;
+    }
+  });
+  
+  return pfx + (max + 1).toString().padStart(3, '0');
+}
+
+function isInvoiceIdDuplicate(id) {
+  return invoicesArray.some(i => String(i.invoiceId).toLowerCase() === String(id).toLowerCase());
+}
+
+function isPoIdDuplicate(id) {
+  return purchasesArray.some(p => String(p.poNumber).toLowerCase() === String(id).toLowerCase());
+}
+
+// ─── UI BADGES ───
+function getStatusBadge(obj) {
+  const safeStatus = (typeof obj === 'string' ? obj : (obj.status || 'unpaid')).toLowerCase();
+  let bg = 'var(--surface3)', color = 'var(--ink2)';
+  if (safeStatus === 'paid') { bg = 'var(--accent-light)'; color = 'var(--accent2)'; } 
+  else if (safeStatus === 'unpaid') { bg = 'var(--danger-light)'; color = 'var(--danger)'; } 
+  else if (safeStatus === 'overdue') { bg = 'var(--gold-light)'; color = 'var(--gold)'; } 
+  else if (safeStatus === 'draft') { bg = 'var(--info-light)'; color = 'var(--info)'; }
+  return `<span style="display:inline-block; padding:4px 10px; border-radius:20px; font-size:0.75rem; font-weight:700; text-transform:uppercase; background:${bg}; color:${color};">${safeStatus}</span>`;
+}
+
+// ─── BUTTON SPINNERS ───
+function setButtonLoading(buttonElement, isLoading, originalText = 'Save') {
+  if (!buttonElement) return;
+  if (isLoading) {
+    buttonElement.disabled = true;
+    buttonElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+  } else {
+    buttonElement.disabled = false;
+    buttonElement.innerHTML = originalText;
+  }
+}
+
+// ─── 1-CLICK DATABASE BACKUP ──────────────────────────────
+function downloadDatabaseBackup() {
+  toast('Generating database backup...', 'info');
+  const backupData = {
+    store_id: currentStoreId,
+    timestamp: new Date().toISOString(),
+    business_profile: bizProfile,
+    customers: customersArray,
+    inventory: inventoryStock,
+    suppliers: suppliersArray,
+    invoices: invoicesArray,
+    purchases: purchasesArray,
+    expenses: expensesArray
+  };
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+  const dlAnchor = document.createElement('a');
+  dlAnchor.setAttribute("href", dataStr);
+  dlAnchor.setAttribute("download", `BillingSuite_Backup_${currentStoreId.replace(/\s+/g, '_')}_${today()}.json`);
+  document.body.appendChild(dlAnchor);
+  dlAnchor.click();
+  dlAnchor.remove();
+  toast('Backup downloaded successfully!', 'success');
+}
+
+
+
+// ══════════════════════════════════════════════════════════════
+//        DASHBOARD & REPORTS ENGINE
+// ══════════════════════════════════════════════════════════════
+
+function updateDashboard() {
+  let totalRev = 0, totalPur = 0;
+  
+  invoicesArray.filter(i => i.status !== 'draft').forEach(i => totalRev += (i.grandTotal || 0));
+  purchasesArray.forEach(p => totalPur += (p.totalAmount || 0));
+  
+  const dRev = document.getElementById('dashTotalRevenue'); if(dRev) dRev.textContent = '₹' + fmt(totalRev);
+  const dPur = document.getElementById('dashTotalPurchases'); if(dPur) dPur.textContent = '₹' + fmt(totalPur);
+  const dCnt = document.getElementById('dashInvCount'); if(dCnt) dCnt.textContent = invoicesArray.length;
+  
+  const topProducts = {};
+  invoicesArray.filter(i => i.status !== 'draft').forEach(inv => {
+    (inv.items || []).forEach(it => {
+      const name = it.description || it.desc;
+      if (!name) return;
+      if (!topProducts[name]) topProducts[name] = { qty: 0, revenue: 0 };
+      topProducts[name].qty += parseFloat(it.quantity || it.qty || 0);
+      topProducts[name].revenue += parseFloat(it.unitPrice || it.price || 0) * parseFloat(it.quantity || it.qty || 0);
+    });
+  });
+
+  const sortedTop = Object.entries(topProducts).sort((a,b) => b[1].revenue - a[1].revenue).slice(0, 5);
+  const topEl = document.getElementById('dashTopProducts');
+  if (topEl) {
+    topEl.innerHTML = sortedTop.length 
+      ? sortedTop.map(p => `<div class="list-item"><div><div class="list-item-title">${esc(p[0])}</div><div class="list-item-sub">Sold: ${p[1].qty} units</div></div><div class="list-item-amount">₹${fmt(p[1].revenue)}</div></div>`).join('')
+      : '<div class="empty-state"><i class="fas fa-star"></i><p>No sales data yet</p></div>';
+  }
+  
+  if (typeof generateReports === 'function') generateReports();
+}
+
+function setDashPeriod(period, btnElement) {
+  document.querySelectorAll('.dash-period-btn').forEach(b => b.classList.remove('active'));
+  if(btnElement) btnElement.classList.add('active');
+  // Logic for filtering by date can be added here!
+  updateDashboard(); 
+}
+
+function setReportRange(range, btnElement) {
+  if (btnElement) {
+    document.querySelectorAll('.date-filter-btn').forEach(b => b.classList.remove('active'));
+    btnElement.classList.add('active');
+  }
+  generateReports();
+}
+
+function generateReports() {
+  let salesRev = 0, salesTotal = 0, purTotal = 0;
+  let gstColl = 0, gstPaid = 0;
+  
+  invoicesArray.filter(i => i.status !== 'draft').forEach(i => {
+    salesRev += (i.subtotal || 0);
+    salesTotal += (i.grandTotal || 0);
+    gstColl += (i.gstAmount || 0);
+  });
+  
+  purchasesArray.forEach(p => {
+    purTotal += (p.totalAmount || 0);
+    gstPaid += (p.gstAmount || 0);
+  });
+  
+  const profit = salesTotal - purTotal;
+  
+  // Update KPI Cards
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = '₹' + fmt(val); };
+  setEl('repSalesRevenue', salesRev);
+  setEl('repTotalSales', salesTotal);
+  setEl('repTotalPurchases', purTotal);
+  setEl('repGSTCollected', gstColl);
+  setEl('repGSTPaid', gstPaid);
+  setEl('repGSTNet', gstColl - gstPaid);
+  
+  const repInv = document.getElementById('repInvCount'); if (repInv) repInv.textContent = invoicesArray.length;
+  
+  const pBox = document.getElementById('repProfitBox');
+  const lBox = document.getElementById('repLossBox');
+  if (profit >= 0) {
+    setEl('repProfit', profit); setEl('repLoss', 0);
+    if(pBox) pBox.style.borderColor = 'var(--accent2)'; if(lBox) lBox.style.borderColor = 'transparent';
+  } else {
+    setEl('repProfit', 0); setEl('repLoss', Math.abs(profit));
+    if(pBox) pBox.style.borderColor = 'transparent'; if(lBox) lBox.style.borderColor = 'var(--danger)';
+  }
+
+  // Update GST Breakdown
+  const gstC = document.getElementById('gCGSTColl'), gstP = document.getElementById('gCGSTPaid'), gstN = document.getElementById('gCGSTNet');
+  const sgtC = document.getElementById('gSGSTColl'), sgtP = document.getElementById('gSGSTPaid'), sgtN = document.getElementById('gSGSTNet');
+  const totC = document.getElementById('gTotalColl'), totP = document.getElementById('gTotalPaid'), totN = document.getElementById('gTotalNet');
+  
+  if (bizProfile.supplyType === 'inter') {
+    if(gstC) gstC.textContent = '-'; if(gstP) gstP.textContent = '-'; if(gstN) gstN.textContent = '-';
+    if(sgtC) sgtC.textContent = '-'; if(sgtP) sgtP.textContent = '-'; if(sgtN) sgtN.textContent = '-';
+  } else {
+    const cVal = gstColl/2, pVal = gstPaid/2;
+    if(gstC) gstC.textContent = '₹'+fmt(cVal); if(gstP) gstP.textContent = '₹'+fmt(pVal); if(gstN) gstN.textContent = '₹'+fmt(cVal-pVal);
+    if(sgtC) sgtC.textContent = '₹'+fmt(cVal); if(sgtP) sgtP.textContent = '₹'+fmt(pVal); if(sgtN) sgtN.textContent = '₹'+fmt(cVal-pVal);
+  }
+  if(totC) totC.textContent = '₹'+fmt(gstColl); if(totP) totP.textContent = '₹'+fmt(gstPaid); if(totN) totN.textContent = '₹'+fmt(gstColl-gstPaid);
+
+  renderCharts(salesTotal, purTotal);
+}
+
+function renderCharts(sales, purchases) {
+  if (typeof Chart === 'undefined') return;
+  Chart.defaults.font.family = "'DM Sans', sans-serif";
+  Chart.defaults.color = '#6b6560';
+
+  // Sales vs Purchases Chart
+  const ctxSales = document.getElementById('reportSalesChart');
+  if (ctxSales) {
+    if (App.chartSales) App.chartSales.destroy();
+    App.chartSales = new Chart(ctxSales, {
+      type: 'bar',
+      data: { labels: ['Overall'], datasets: [
+        { label: 'Sales', data: [sales], backgroundColor: '#2d7a62', borderRadius: 4 },
+        { label: 'Purchases', data: [purchases], backgroundColor: '#c8933a', borderRadius: 4 }
+      ]},
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+    });
+  }
+
+  // Profit Trend (Placeholder logic for visual)
+  const ctxProfit = document.getElementById('reportProfitChart');
+  if (ctxProfit) {
+    if (App.chartProfit) App.chartProfit.destroy();
+    App.chartProfit = new Chart(ctxProfit, {
+      type: 'line',
+      data: { labels: ['W1', 'W2', 'W3', 'W4'], datasets: [{ label: 'Net Profit', data: [0, sales*0.2, sales*0.5, sales - purchases], borderColor: '#1a5276', backgroundColor: 'rgba(26,82,118,0.1)', fill: true, tension: 0.4 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    });
+  }
+
+  // Pie Chart
+  const ctxPie = document.getElementById('reportPieChart');
+  if (ctxPie) {
+    if (App.chartPie) App.chartPie.destroy();
+    App.chartPie = new Chart(ctxPie, {
+      type: 'doughnut',
+      data: { labels: ['Profit', 'Expenses/Cost'], datasets: [{ data: [Math.max(0, sales - purchases), purchases], backgroundColor: ['#2d7a62', '#c0392b'], borderWidth: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom' } } }
+    });
+  }
+}
+
+// ─── THEME & DARK MODE ENGINE ───
+function toggleDark() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  const pill = document.getElementById('darkPill');
+  
+  if (isDark) {
+    html.removeAttribute('data-theme');
+    localStorage.setItem('bs_theme', 'light');
+    if(pill) pill.classList.remove('on');
+  } else {
+    html.setAttribute('data-theme', 'dark');
+    localStorage.setItem('bs_theme', 'dark');
+    if(pill) pill.classList.add('on');
+  }
+}
+
+function initThemeUI() {
+  const pill = document.getElementById('darkPill');
+  if (localStorage.getItem('bs_theme') === 'dark' && pill) {
+    pill.classList.add('on');
+  }
+}
+
+// Kickoff
+window.addEventListener('DOMContentLoaded', () => {
+  initThemeUI();
+  initTabs();
+  loadSupabaseData();
+  
+  // Reveal the app seamlessly after everything is set up
+  setTimeout(() => {
+    const layout = document.querySelector('.layout');
+    if (layout) layout.style.opacity = '1';
+  }, 50); 
+});
