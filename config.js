@@ -104,6 +104,13 @@ async function saveSettings() {
 
 // ─── POPULATE SETTINGS UI WHEN STORE CHANGES ───────────────
 function populateSettingsUI() {
+
+  initStateDropdown();
+
+  const stateSelect = document.getElementById('state-list');
+  if (stateSelect && bizProfile && bizProfile.state) {
+    stateSelect.value = bizProfile.state;
+  }
   const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
   
   setVal('settStoreAlias', bizProfile.storeAlias);
@@ -185,3 +192,5 @@ function loadSettingsPreviews() {
   if (bizProfile.logo) showImagePreview('logo', bizProfile.logo);
   if (bizProfile.signature) showImagePreview('signature', bizProfile.signature);
 }
+
+

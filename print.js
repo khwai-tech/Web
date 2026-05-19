@@ -1013,3 +1013,32 @@ function buildPurchaseHTML(templateName, isSample, purData = null) {
   </body>
   </html>`;
 }
+
+function numberToWords(num) {
+  if (!num || num === 0) return "Zero";
+  
+  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  
+  function inWords(n) {
+    let str = "";
+    if (n > 9999999) { str += inWords(Math.floor(n / 10000000)) + " Crore "; n %= 10000000; }
+    if (n > 99999)   { str += inWords(Math.floor(n / 100000)) + " Lakh "; n %= 100000; }
+    if (n > 999)     { str += inWords(Math.floor(n / 1000)) + " Thousand "; n %= 1000; }
+    if (n > 99)      { str += inWords(Math.floor(n / 100)) + " Hundred "; n %= 100; }
+    if (n > 19)      { str += tens[Math.floor(n / 10)] + " "; n %= 10; }
+    if (n > 0)       { str += ones[n] + " "; }
+    return str.trim();
+  }
+  
+  // Handle decimals (Paisa)
+  const integerPart = Math.floor(num);
+  const decimalPart = Math.round((num - integerPart) * 100);
+  
+  let result = inWords(integerPart);
+  if (decimalPart > 0) {
+    result += " and " + inWords(decimalPart) + " Paisa";
+  }
+  
+  return result;
+}
