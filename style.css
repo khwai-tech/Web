@@ -669,3 +669,511 @@ select.form-control { appearance:none; background-image:url("data:image/svg+xml,
   gap: 8px;
 }
 
+/* ─── UNIVERSAL 3-VIEW ENGINE (Polished) ─── */
+.view-container { display: grid; gap: 16px; transition: 0.2s ease; margin-top: 10px; }
+
+/* 1. GRID VIEW */
+.view-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.view-grid .contact-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); transition: 0.2s; }
+.view-grid .contact-card:hover { border-color: var(--accent2); box-shadow: 0 4px 12px rgba(0,0,0,0.06); transform: translateY(-2px); }
+
+/* 2. LIST VIEW */
+.view-list { grid-template-columns: 1fr; gap: 10px; }
+.view-list .contact-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 20px; display: flex; flex-direction: row; justify-content: space-between; align-items: center; transition: 0.2s; }
+.view-list .contact-card:hover { border-color: var(--accent2); background: var(--surface2); }
+
+/* 3. TABLE VIEW FIX (Removes grid layout so the table flows naturally) */
+.view-table { display: block !important; } 
+.view-table .invoice-table { margin-top: 0; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+
+/* ==========================================================================
+   ENTERPRISE DASHBOARD & WORKFLOW LAYOUT EXTENSIONS
+   ========================================================================== */
+
+/* ─── FINANCIAL MATRIX GRID (4 COLUMNS) ─── */
+.dash-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* ─── QUICK WORKFLOW TERMINALS GRID (4 COLUMNS) ─── */
+.dash-qa-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* ─── QUICK ACTION BUTTON CARDS ─── */
+.qa-btn-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 0.2s ease, 
+              box-shadow 0.2s ease;
+}
+
+.qa-btn-card:hover {
+  border-color: var(--accent2);
+  background: var(--surface);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  transform: translateY(-2px);
+}
+
+.qa-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.qa-btn-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.qa-btn-info strong {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.qa-btn-info small {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  color: var(--ink3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── DASHBOARD OVERDUE & OUTSTANDING REMINDER TOTAL BAR ─── */
+.od-total-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--danger-light);
+  border: 1px solid rgba(192, 57, 43, 0.15);
+  border-radius: var(--r-sm);
+  color: var(--danger);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  margin-top: 12px;
+}
+
+/* ─── CHART METRICS HEADER BAR ─── */
+.chart-meta-row {
+  display: flex;
+  gap: 24px;
+  margin: 16px 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.chart-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chart-meta-lbl {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink3);
+  font-weight: 600;
+}
+
+.chart-meta-val {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* ─── RESPONSIVE MEDIA BREAKPOINTS (MOBILE & TABLET DOWNGRADES) ─── */
+@media (max-width: 1200px) {
+  .dash-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dash-qa-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .dash-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .dash-qa-grid {
+    grid-template-columns: 1fr;
+  }
+  .chart-meta-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
+/* ─── MISSING WORKFLOW TERMINAL METRICS HIGHLIGHT TUNING ─── */
+.chart-tab-bar {
+  display: flex;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.chart-tab {
+  background: transparent;
+  border: none;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink2);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-tab:hover {
+  color: var(--accent);
+  background: var(--surface);
+}
+
+.chart-tab.active {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid var(--border);
+}
+
+/* ─── RECENT INVOICE / PO CONTENT ITEMS STRUCTURES ─── */
+.list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px var(--r-md);
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.list-item:last-child {
+  border-bottom: none;
+}
+
+.list-item:hover {
+  background: var(--surface2);
+  cursor: pointer;
+}
+
+.list-item-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.list-item-sub {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.76rem;
+  color: var(--ink3);
+  margin-top: 2px;
+}
+
+.list-item-amount {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+
+/* ==========================================================================
+   CATEGORIZED QUICK ACTIONS FLEX ENGINE SYSTEM
+   ========================================================================== */
+
+/* ─── MASTER WRAPPER GRID (3 SECTIONS SIDE-BY-SIDE) ─── */
+.qa-master-wrapper {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr; /* Create optimized structural columns spacing */
+  gap: 20px;
+  align-items: flex-start;
+}
+
+/* ─── SECTION BOX CONTEXT ─── */
+.qa-category-section {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ─── SECTION TITLE HEADER GAUGE ─── */
+.qa-category-header {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ─── CONTAINER STACK FOR ROW ACTIONS ─── */
+.qa-category-body {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+
+/* ─── HIGH-DENSITY ACTION ROW BUTTON ─── */
+.qa-action-row-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 0.15s ease, 
+              box-shadow 0.15s ease;
+}
+
+.qa-action-row-btn:hover {
+  border-color: var(--accent2);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+  transform: translateX(3px); /* Subtle shift to provide an interactive feel */
+}
+
+/* ─── ROW ICON MATRIX ROUNDS ─── */
+.qa-row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+/* Contextual Row Color Badges */
+.color-info    { background: var(--info-light);   color: var(--info); }
+.color-gold    { background: var(--gold-light);   color: var(--gold); }
+.color-purple  { background: #f0eaff;             color: #7c3aed; }
+.color-teal    { background: #e6f6f0;             color: #0f766e; }
+.color-accent  { background: var(--accent-light); color: var(--accent2); }
+.color-danger  { background: var(--danger-light); color: var(--danger); }
+
+/* ─── COMPACT ROW TYPOGRAPHY ─── */
+.qa-row-text {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.qa-row-text strong {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.qa-row-text small {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  color: var(--ink3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── MEDIA QUERY DOWNGRADES FOR COMPRESSION SAFETY ─── */
+@media (max-width: 1050px) {
+  .qa-master-wrapper {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 680px) {
+  .qa-master-wrapper {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   DASHBOARD REFERENCE WIREFRAME ALIGNMENTS MODIFICATIONS
+   ========================================================================== */
+
+/* HORIZONTAL ACTION ROW PACKING */
+.dash-qa-horizontal-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+}
+
+.qa-horizontal-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.qa-horizontal-action-btn:hover {
+  background: var(--surface);
+  border-color: var(--accent2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  transform: translateY(-2px);
+}
+
+.qa-mini-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+}
+
+.qa-horizontal-action-btn span {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* HIGH-DENSITY TOP PRODUCTS RETAIL ROWS CATALOG LIST */
+.top-selling-catalog-list .catalog-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.top-selling-catalog-list .catalog-row:last-child {
+  border-bottom: none;
+}
+.catalog-item-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.catalog-index-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink3);
+  background: var(--surface2);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.catalog-item-text {
+  display: flex;
+  flex-direction: column;
+}
+.catalog-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.catalog-subtext {
+  font-size: 0.7rem;
+  color: var(--ink3);
+}
+.catalog-valuation {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* RIBBON ALERTS ANIMATION */
+.dash-alert-ribbon-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.dash-alert-ribbon-card:hover {
+  transform: translateX(4px);
+  box-shadow: var(--shadow);
+}
+
+/* COMPRESSION MEDIA GAUGE OVERRIDES FOR DYNAMIC SIDEBAR LAYOUTS */
+@media (max-width: 1280px) {
+  .dash-master-layout {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media (max-width: 900px) {
+  .dash-qa-horizontal-row {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+  .dash-split-analytics {
+    grid-template-columns: 1fr !important;
+  }
+  .dash-business-summary-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+@media (max-width: 500px) {
+  .dash-qa-horizontal-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ─── PREMIUM DASHBOARD HEADER TYPOGRAPHY ─── */
+.dash-main-greeting {
+  font-family: 'Harmond', sans-serif !important;
+  font-size: 1.75rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.1 !important;
+  color: var(--ink);
+}
+
+
+
