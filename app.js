@@ -480,17 +480,35 @@ function restoreViewButtons() {
 // ─── UNIFIED ID GENERATION MATRIX ───
 function getNextId(type) {
   let arr, key, prefix;
-  if (type === 'invoice') { arr = invoicesArray; key = 'invoiceId'; prefix = bizProfile.invPrefix || 'INV-'; } 
-  else if (type === 'purchase') { arr = purchasesArray; key = 'poNumber'; prefix = bizProfile.poPrefix || 'PO-'; } 
-  else if (type === 'product') { arr = inventoryStock; key = 'id'; prefix = 'ITM-'; }
-  const pfx = prefix.endsWith('-') ? prefix : prefix + '-';
+  
+  // 1. Read directly from bizProfile (with ?. fallback in case settings are loading)
+  if (type === 'invoice') { arr = invoicesArray; key = 'invoiceId'; prefix = bizProfile?.invPrefix || 'INV-'; } 
+  else if (type === 'purchase') { arr = purchasesArray; key = 'poNumber'; prefix = bizProfile?.poPrefix || 'PO-'; } 
+  else if (type === 'product') { arr = inventoryStock; key = 'id'; prefix = bizProfile?.productPrefix || 'ITM-'; }
+  else return 'ID-001'; 
+
+  // 2. Ensure it ends with a hyphen
+  let pfx = prefix.endsWith('-') ? prefix : prefix + '-';
+
   if (!arr || arr.length === 0) return pfx + '001';
+  
   let max = 0;
+  
   arr.forEach(obj => {
     const str = String(obj[key] || '');
-    const match = str.match(/\d+$/);
-    if (match) { const num = parseInt(match[0], 10); if (num > max) max = num; }
+    
+    // 3. Strict match: Only count items that start with this exact prefix
+    if (str.startsWith(pfx)) {
+      // Strip the prefix away, leaving only the number (e.g., "045")
+      const numStr = str.replace(pfx, ''); 
+      const num = parseInt(numStr, 10);
+      
+      if (!isNaN(num) && num > max) {
+        max = num;
+      }
+    }
   });
+  
   return pfx + (max + 1).toString().padStart(3, '0');
 }
 
@@ -869,4 +887,3 @@ window.addEventListener('DOMContentLoaded', () => {
   initSupplierAutoFill();
   setTimeout(() => { const layout = document.querySelector('.layout'); if (layout) layout.style.opacity = '1'; }, 50);
 });
-
