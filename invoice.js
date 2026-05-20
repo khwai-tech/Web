@@ -6,17 +6,25 @@ function renderInvoiceEditor() {
   const body = document.getElementById('invoiceItemsBody');
   if (!body) return;
   
+  // ─── THE MAGIC TRICK: Remember where the user's cursor is! ───
+  const activeId = document.activeElement ? document.activeElement.id : null;
+
   if (invLineItems.length > 0 && invLineItems[0].hsn === undefined) {
     invLineItems.forEach(i => i.hsn = '');
   }
 
+  // Generate the HTML (Notice the dynamic `id=""` added to every input)
   body.innerHTML = invLineItems.map((it, i) => {
-    const { gst: gstAmt, total } = calcGST(it.qty * it.price, it.gstRate, invGstType);
+    // Safe fallback in case calcGST isn't defined yet
+    const { gst: gstAmt, total } = typeof calcGST === 'function' 
+        ? calcGST(it.qty * it.price, it.gstRate, typeof invGstType !== 'undefined' ? invGstType : 'Exclusive') 
+        : { gst: 0, total: it.qty * it.price };
+
     return `<tr>
-      <td><input class="item-input inv-field" data-i="${i}" data-f="desc" value="${esc(it.desc)}" placeholder="Add item…" list="productList"></td>
-      <td><input class="item-input inv-field" data-i="${i}" data-f="hsn" value="${esc(it.hsn || '')}" placeholder="HSN" style="width:80px; font-size:0.8rem"></td>
-      <td><input class="item-input inv-field" data-i="${i}" data-f="qty" type="number" value="${it.qty}" min="0.01" step="0.01" style="width:60px"></td>
-      <td><input class="item-input inv-field" data-i="${i}" data-f="price" type="number" value="${it.price}" min="0" step="0.01" style="width:90px"></td>
+      <td><input id="inv_inp_${i}_desc" class="item-input inv-field form-control" data-i="${i}" data-f="desc" value="${esc(it.desc)}" placeholder="Search product..." list="productList"></td>
+      <td><input id="inv_inp_${i}_hsn" class="item-input inv-field form-control" data-i="${i}" data-f="hsn" value="${esc(it.hsn || '')}" placeholder="HSN" style="width:80px; font-size:0.8rem"></td>
+      <td><input id="inv_inp_${i}_qty" class="item-input inv-field form-control" data-i="${i}" data-f="qty" type="number" value="${it.qty}" min="0.01" step="0.01" style="width:70px"></td>
+      <td><input id="inv_inp_${i}_price" class="item-input inv-field form-control" data-i="${i}" data-f="price" type="number" value="${it.price}" min="0" step="0.01" style="width:100px"></td>
       <td class="no-print">
         <select class="gst-select-inline inv-gst-select" data-i="${i}">
           <option value="0"    ${it.gstRate === 0    ? 'selected' : ''}>0%</option>
@@ -26,42 +34,74 @@ function renderInvoiceEditor() {
           <option value="0.28" ${it.gstRate === 0.28 ? 'selected' : ''}>28%</option>
         </select>
       </td>
-      <td style="color:var(--gold);font-weight:500">${fmt(gstAmt)}</td>
-      <td style="font-weight:600;color:var(--accent)">${fmt(total)}</td>
-      <td class="no-print"><button class="btn-icon rem-inv-item" data-i="${i}" title="Remove item"><i class="fas fa-trash-alt"></i></button></td>
+      <td style="color:var(--gold); font-weight:500; vertical-align:middle; text-align:right;">₹${fmt(gstAmt)}</td>
+      <td style="font-weight:600; color:var(--accent); vertical-align:middle; text-align:right;">₹${fmt(total)}</td>
+      <td class="no-print" style="vertical-align:middle; text-align:center;"><button id="inv_btn_${i}_del" class="btn-icon rem-inv-item" data-i="${i}" title="Remove item" style="color:var(--danger)"><i class="fas fa-trash-alt"></i></button></td>
     </tr>`;
   }).join('');
 
+  // 1. Text & Number Input Listeners
   body.querySelectorAll('.inv-field').forEach(inp => {
     inp.addEventListener('change', () => {
       const i = +inp.dataset.i, f = inp.dataset.f;
       if (!invLineItems[i]) return;
+      
       if (f === 'qty' || f === 'price') {
         invLineItems[i][f] = parseFloat(inp.value) || 0;
       } else {
         invLineItems[i][f] = inp.value;
-        const match = inventoryStock.find(p => p.name.toLowerCase() === inp.value.toLowerCase());
-        if (match && f === 'desc') {
-          invLineItems[i].price   = match.sellPrice || match.price || 0;
-          invLineItems[i].gstRate = match.gstRate   || 0;
-          invLineItems[i].hsn     = match.hsn       || '';
+        
+        // ─── ENHANCED AUTO-FILL ───
+        if (f === 'desc' && typeof inventoryStock !== 'undefined') {
+          const searchVal = inp.value.trim().toLowerCase();
+          // Checks if they typed the Name OR the Product ID!
+          const match = inventoryStock.find(p => 
+            (p.name && p.name.toLowerCase() === searchVal) || 
+            (p.id && p.id.toLowerCase() === searchVal)
+          );
+          
+          if (match) {
+            invLineItems[i].price   = parseFloat(match.sellPrice || match.price || 0);
+            invLineItems[i].gstRate = parseFloat(match.gstRate || 0);
+            invLineItems[i].hsn     = match.hsn || '';
+          }
         }
       }
       renderInvoiceEditor();
     });
   });
 
+  // 2. GST Dropdown Listeners
   body.querySelectorAll('.inv-gst-select').forEach(sel => {
     sel.addEventListener('change', () => {
       const i = +sel.dataset.i;
-      if (invLineItems[i]) { invLineItems[i].gstRate = parseFloat(sel.value); renderInvoiceEditor(); }
+      if (invLineItems[i]) { 
+        invLineItems[i].gstRate = parseFloat(sel.value); 
+        renderInvoiceEditor(); 
+      }
     });
   });
 
+  // 3. Delete Row Listeners
   body.querySelectorAll('.rem-inv-item').forEach(btn => {
-    btn.addEventListener('click', () => { invLineItems.splice(+btn.dataset.i, 1); renderInvoiceEditor(); });
+    btn.addEventListener('click', () => { 
+      invLineItems.splice(+btn.dataset.i, 1); 
+      renderInvoiceEditor(); 
+    });
   });
 
+  // 4. Trigger the bottom totals calculation
+  if (typeof calcInvoiceTotals === 'function') calcInvoiceTotals();
+
+  // ─── THE MAGIC TRICK RESTORE: Put the cursor back! ───
+  if (activeId) {
+    const elToFocus = document.getElementById(activeId);
+    if (elToFocus) elToFocus.focus();
+  }
+}
+
+function setInvoiceSupplyType(type) {
+  App.currentInvoiceSupplyType = type;
   calcInvoiceTotals();
 }
 
@@ -75,11 +115,6 @@ function _computeInvoiceTotals() {
   const discount = invDiscType === 'flat' ? Math.min(discVal, grand) : grand * (discVal / 100);
   grand -= discount;
   return { sub, gstTotal, grand, discount };
-}
-
-function setInvoiceSupplyType(type) {
-  App.currentInvoiceSupplyType = type;
-  calcInvoiceTotals();
 }
 
 function calcInvoiceTotals() {
@@ -238,34 +273,62 @@ async function saveInvoice() {
     await supabase.from('customers').insert([newCust]); 
   }
  
+  // FIX 1: The "Ghost Stock" Edit Reversal Bug
+  // Swapped to a for...of loop so we can await the Supabase updates!
   if (isEditing) {
     const oldInv = invoicesArray.find(i => i.invoiceId === invId);
     if (oldInv) {
-      (oldInv.items || []).forEach(oldIt => {
+      for (let oldIt of (oldInv.items || [])) {
         const existing = inventoryStock.find(p => p.name.toLowerCase() === (oldIt.description || oldIt.desc || '').toLowerCase());
-        if (existing) existing.stock = (existing.stock || 0) + parseFloat(oldIt.quantity);
-      });
+        if (existing) {
+          existing.stock = (existing.stock || 0) + parseFloat(oldIt.quantity);
+          // MUST sync this reversal back to Supabase!
+          await supabase.from('inventory').update({ stock: existing.stock }).eq('id', existing.id).eq('store_id', currentStoreId);
+        }
+      }
     }
     invoicesArray = invoicesArray.filter(i => i.invoiceId !== invId);
     App.editingInvoiceId = null;
   }
+
+  // Calculate the cost multiplier ONCE outside the loop for speed
+  const cMargin = (typeof bizProfile !== 'undefined' && bizProfile.costMargin) ? parseFloat(bizProfile.costMargin) : 30;
+  const costMultiplier = (100 - cMargin) / 100; 
  
-  // FIX: Adjust stock inventories AND sync updates to Supabase products table
+  // FIX 2: Moved the Auto-Create logic safely INSIDE the item loop!
   for (let it of invLineItems) {
     const existing = inventoryStock.find(p => p.name.toLowerCase() === it.desc.toLowerCase());
     if (existing) {
-      existing.stock = (existing.stock || 0) - it.qty;
-      await supabase.from('products').update({ stock: existing.stock }).eq('id', existing.id).eq('store_id', currentStoreId);
+      existing.stock = (existing.stock || 0) - parseFloat(it.qty || 0);
+      await supabase.from('inventory').update({ stock: existing.stock }).eq('id', existing.id).eq('store_id', currentStoreId);
     } else {
-      const newProd = { id: getNextId('product'), store_id: currentStoreId, name: it.desc, hsn: it.hsn || '', sellPrice: it.price, costPrice: it.price * 0.7, gstRate: it.gstRate, stock: -it.qty, type: 'Goods', status: 'Active', category: 'General', unit: 'PCS', barcode: '' };
+      const safeId = getNextId('product'); 
+      const sellPrice = parseFloat(it.price || 0);
+      const dynamicCost = sellPrice * costMultiplier; 
+
+      const newProd = { 
+        id: safeId, 
+        store_id: currentStoreId, 
+        name: it.desc, 
+        hsn: it.hsn || '', 
+        
+        sell_price: sellPrice, 
+        cost_price: dynamicCost, 
+        gst_rate: parseFloat(it.gstRate || 0), 
+        
+        
+        stock: -parseFloat(it.qty || 0), 
+        type: 'Goods', status: 'Active', category: 'General', unit: 'PCS', barcode: '' 
+      };
+
       inventoryStock.push(newProd);
-      await supabase.from('products').insert([newProd]);
+      await supabase.from('inventory').insert([newProd]);
     }
   }
  
   invoicesArray.unshift({ ...payload, created_at: new Date().toISOString() });
   if (typeof syncUI === 'function') syncUI(); else { renderInvoiceLists(); updateDatalists(); }
-  
+ 
   let dbError;
   if (isEditing) {
     const { error } = await supabase.from('invoices').update(payload).eq('invoiceId', invId).eq('store_id', currentStoreId);
@@ -329,7 +392,7 @@ function clearInvoiceForm(force = false) {
   if (banner) banner.style.display = 'none';
 
   const supplySelect = document.getElementById('invSupplyTypeSelect');
-  if (supplySelect) supplySelect.value = 'intra';
+  if (supplySelect) supplySelect.value = 'intra';  // This is correct
 
   const invNum = document.getElementById('invNumber');
   if (invNum) { invNum.value = getNextId('invoice'); invNum.readOnly = false; invNum.style.backgroundColor = ''; }
@@ -441,17 +504,34 @@ function filterInvoices() {
 }
 
 function renderInvoiceLists() {
-  // FIX 2B: Corrected badge binding strings here too
-  const makeItem = inv => `<div class="list-item" onclick="showInvoiceDetail('${esc(inv.invoiceId)}')"><div><div class="list-item-title">${esc(inv.invoiceId)}</div><div class="list-item-sub">${esc(inv.customerName)} · ${dateLabel(inv.date)}</div></div><div style="text-align:right"><div class="list-item-amount">${fmt(inv.grandTotal)}</div>${getStatusBadge(inv.status || 'unpaid')}</div></div>`;
-  const normalized = invoicesArray.map(normalizeInvoiceKeys);
+  // FIX 1: Point the onclick hook to our brand new Quick View Modal!
+  const makeItem = inv => `
+    <div class="list-item" onclick="quickViewInvoice('${esc(inv.invoiceId)}')">
+      <div>
+        <div class="list-item-title" style="font-weight: 600; color: var(--ink);">${esc(inv.invoiceId)}</div>
+        <div class="list-item-sub" style="font-size: 0.8rem; color: var(--ink2);">${esc(inv.customerName)} · ${typeof dateLabel === 'function' ? dateLabel(inv.date) : inv.date}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="list-item-amount" style="font-weight: 700; color: var(--accent);">₹${fmt(inv.grandTotal)}</div>
+        ${typeof getStatusBadge === 'function' ? getStatusBadge(inv.status || 'unpaid') : `<span class="badge">${inv.status}</span>`}
+      </div>
+    </div>`;
+
+  // Safely normalize if the function exists
+  const normalized = typeof normalizeInvoiceKeys === 'function' ? invoicesArray.map(normalizeInvoiceKeys) : invoicesArray;
+  
+  // Grab the 4 most recent invoices
   const recent = normalized.slice(0, 4);
-  const emptyHTML = () => `<div class="empty-state"><i class="fas fa-file-invoice-dollar"></i><p>No invoices yet</p></div>`;
-  ['recentInvoiceList','dashRecentInvoices'].forEach(id => {
+  const emptyHTML = () => `<div class="empty-state"><i class="fas fa-file-invoice-dollar"></i><p>No recent invoices</p></div>`;
+  
+  // FIX 2: Updated the ID to perfectly match your HTML's "dashActivityFeed"
+  ['recentInvoiceList', 'dashActivityFeed'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = recent.length ? recent.map(makeItem).join('') : emptyHTML();
   });
-  filterInvoices();
-  _updateInvoiceQuickStats();
+  
+  if (typeof filterInvoices === 'function') filterInvoices();
+  if (typeof _updateInvoiceQuickStats === 'function') _updateInvoiceQuickStats();
 }
 
 function _updateInvoiceQuickStats() {
@@ -519,8 +599,8 @@ function showInvoiceDetail(id) {
       ${isInter ? `
         <div class="totals-row"><span>IGST Total</span><span>${fmt(inv.gstAmount)}</span></div>
       ` : `
-        <div class="totals-row"><span>CGST (50%)</span><span>₹${fmt(inv.gstAmount / 2)}</span></div>
-        <div class="totals-row"><span>SGST (50%)</span><span>₹${fmt(inv.gstAmount / 2)}</span></div>
+        <div class="totals-row"><span>CGST</span><span>₹${fmt(inv.gstAmount / 2)}</span></div>
+        <div class="totals-row"><span>SGST</span><span>₹${fmt(inv.gstAmount / 2)}</span></div>
       `}
       
       ${inv.discount ? `<div class="totals-row discount-row"><span>Discount</span><span>– ${fmt(inv.discount)}</span></div>` : ''}
@@ -635,18 +715,63 @@ function duplicateInvoice(id) {
 
 async function deleteInvoice(id) {
   if (!confirm(`Permanently delete ${id}? Inventory counts will reverse automatically.`)) return;
+  
   const rawInv = invoicesArray.find(i => (i.invoiceId || i.invoiceid) === id);
   if (!rawInv) return;
-  const invToDelete = normalizeInvoiceKeys(rawInv);
-  (invToDelete.items || []).forEach(oldIt => {
-    const existing = inventoryStock.find(p => p.name.toLowerCase() === (oldIt.description || oldIt.desc || '').toLowerCase());
-    if (existing) existing.stock = (existing.stock || 0) + parseFloat(oldIt.quantity);
-  });
   
+  const invToDelete = normalizeInvoiceKeys(rawInv);
+  
+  // FIX 1: Change to a standard 'for...of' loop so we can use 'await' properly
+  for (let oldIt of (invToDelete.items || [])) {
+    const itemName = (oldIt.description || oldIt.desc || '').toLowerCase();
+    
+    // Fallback logic: Try finding by ID first if it exists, otherwise fall back to name
+    const existing = inventoryStock.find(p => 
+        (oldIt.itemId && p.id === oldIt.itemId) || 
+        (p.name && p.name.toLowerCase() === itemName)
+    );
+    
+    if (existing) {
+      // 1. Update local state
+      existing.stock = (existing.stock || 0) + parseFloat(oldIt.quantity || oldIt.qty || 0);
+      
+      // FIX 2: Push the restored stock back to the Supabase 'inventory' table!
+      const { error: invErr } = await supabase
+        .from('inventory')
+        .update({ stock: existing.stock })
+        .eq('id', existing.id);
+        
+      if (invErr) console.error(`Failed to restore stock for ${existing.name}:`, invErr);
+    }
+  }
+  
+  // 2. Remove from local Invoice array
   invoicesArray = invoicesArray.filter(i => (i.invoiceId || i.invoiceid) !== id);
-  closeModal(); if (typeof syncUI === 'function') syncUI(); else { renderInvoiceLists(); updateDashboard(); }
-  await supabase.from('invoices').delete().eq('invoiceId', id).eq('store_id', currentStoreId);
-  toast('Invoice row purged cleanly.', 'success');
+  
+  // 3. Delete from Supabase Invoices table
+  // NOTE: Double-check if your column is 'invoiceId' or 'invoice_id' in Supabase!
+  const { error: delErr } = await supabase
+      .from('invoices')
+      .delete()
+      .eq('invoiceId', id) 
+      .eq('store_id', currentStoreId);
+      
+  if (delErr) {
+      console.error("Failed to delete invoice from DB:", delErr);
+      toast('Error deleting invoice from database.', 'error');
+      return;
+  }
+
+  // 4. Update the UI safely
+  closeModal(); 
+  if (typeof syncUI === 'function') {
+      syncUI(); 
+  } else { 
+      if (typeof renderInvoiceLists === 'function') renderInvoiceLists(); 
+      if (typeof updateDashboard === 'function') updateDashboard(); 
+  }
+  
+  toast('Invoice purged cleanly and inventory restored.', 'success');
 }
 
 function loadEditInvoice(id) {
@@ -690,11 +815,27 @@ function loadEditInvoice(id) {
 }
 
 function openNewInvoiceForm() {
+  // 1. Clear the standard text inputs (Customer name, dates, etc.)
   clearInvoiceForm(true);
+  
+  // 2. Reset the Line Items Array so it doesn't hold data from a previous invoice
+  if (typeof invLineItems !== 'undefined') {
+    invLineItems = []; 
+    // Push exactly one blank starting row for excellent UX
+    invLineItems.push({ desc: '', hsn: '', qty: 1, price: 0, gstRate: 0 });
+    // Render the fresh table to the screen
+    if (typeof renderInvoiceEditor === 'function') renderInvoiceEditor();
+  }
+
+  // 3. Handle the UI Tab Switching
   const tabNew = document.getElementById('tabNewInvoice');
   const tabEdit = document.getElementById('tabEditInvoice');
+  
   if (tabEdit) tabEdit.style.display = 'none';
-  if (tabNew) { tabNew.style.display = 'inline-block'; tabNew.click(); }
+  if (tabNew) { 
+    tabNew.style.display = 'inline-block'; 
+    tabNew.click(); 
+  }
 }
 
 function cancelInvoice() {
@@ -738,6 +879,91 @@ function setInvoiceViewMode(mode) {
   
   filterInvoices(); // Re-run your existing filter function to refresh the layout
 }
+
+function quickViewInvoice(invId) {
+  const inv = invoicesArray.find(i => i.invoiceId === invId);
+  if (!inv) return;
+
+  const modalTitle = document.getElementById('modalTitle');
+  const modalBody = document.getElementById('modalBody');
+  
+  if (modalTitle) modalTitle.innerHTML = `<i class="fas fa-file-invoice" style="color:var(--accent); margin-right:8px;"></i> Invoice ${inv.invoiceId}`;
+  
+  // Build the items table
+  const itemsHtml = (inv.items || []).map(item => `
+    <tr>
+      <td style="padding: 8px; border-bottom: 1px solid var(--surface3);">${item.description}</td>
+      <td style="padding: 8px; border-bottom: 1px solid var(--surface3); text-align: center;">${item.quantity}</td>
+      <td style="padding: 8px; border-bottom: 1px solid var(--surface3); text-align: right;">₹${parseFloat(item.unitPrice || 0).toFixed(2)}</td>
+      <td style="padding: 8px; border-bottom: 1px solid var(--surface3); text-align: right; font-weight: bold;">₹${(item.quantity * parseFloat(item.unitPrice || 0)).toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  // Determine badge color based on status
+  const statusColor = inv.status === 'paid' ? 'var(--success)' : (inv.status === 'unpaid' ? 'var(--danger)' : 'var(--gold)');
+
+  if (modalBody) {
+    modalBody.innerHTML = `
+      <div style="display:flex; justify-content:space-between; margin-bottom: 20px;">
+        <div>
+          <div style="font-size:0.8rem; color:var(--ink3); font-weight:600; text-transform:uppercase;">Customer</div>
+          <div style="font-size:1.1rem; font-weight:700; color:var(--ink);">${inv.customerName}</div>
+          <div style="font-size:0.85rem; color:var(--ink2);">${inv.date}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:0.8rem; color:var(--ink3); font-weight:600; text-transform:uppercase;">Status</div>
+          <span style="background:${statusColor}; color:white; padding:4px 8px; border-radius:4px; font-size:0.8rem; font-weight:bold; text-transform:uppercase;">${inv.status}</span>
+        </div>
+      </div>
+      
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9rem;">
+        <thead>
+          <tr style="background: var(--surface2); text-transform: uppercase; font-size: 0.75rem; color: var(--ink3);">
+            <th style="padding: 8px; text-align: left;">Item</th>
+            <th style="padding: 8px; text-align: center;">Qty</th>
+            <th style="padding: 8px; text-align: right;">Rate</th>
+            <th style="padding: 8px; text-align: right;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHtml}
+        </tbody>
+      </table>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 16px;">
+        <div style="font-size:0.9rem; color:var(--ink2);">Paid: <strong style="color:var(--success)">₹${parseFloat(inv.amountPaid || 0).toFixed(2)}</strong></div>
+        <div style="font-size: 1.2rem; font-weight: 800; color: var(--accent);">Grand Total: ₹${parseFloat(inv.grandTotal || 0).toFixed(2)}</div>
+      </div>
+    `;
+  }
+
+  // Pop the modal!
+  const modal = document.getElementById('detailModal');
+  if (modal) modal.classList.add('show'); 
+}
+
+// ─── WIRE UP THE ADD ITEM BUTTON ───
+document.addEventListener('DOMContentLoaded', () => {
+  const addInvBtn = document.getElementById('addInvoiceItemBtn');
+  
+  if (addInvBtn) {
+    addInvBtn.addEventListener('click', (e) => {
+      e.preventDefault(); // Prevents the button from accidentally submitting or refreshing
+      
+      // Push a fresh, empty row into your single source of truth
+      invLineItems.push({ 
+        desc: '', 
+        hsn: '', 
+        qty: 1, 
+        price: 0, 
+        gstRate: 0 
+      });
+      
+      // Redraw the table with the new row included
+      renderInvoiceEditor();
+    });
+  }
+});
 
 // Restore saved view on page load
 setTimeout(() => {

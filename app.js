@@ -160,7 +160,7 @@ function toast(msg, type = 'info') {
 
 // ─── UPGRADED ENTERPRISE DASHBOARD COMPUTATION ENGINE ──────────────────
 function updateDashboard() {
-  // TIME-AWARE DYNAMIC GREETING LOGIC
+  // 1. TIME-AWARE DYNAMIC GREETING LOGIC
   const dashGreeting = document.getElementById('dashGreetingText');
   if (dashGreeting) {
     const hours = new Date().getHours();
@@ -186,43 +186,49 @@ function updateDashboard() {
   let customerAdvances = 0;
   let totalStockAssetValue = 0;
 
-  // 1. Calculate Customer Invoices & Outstanding Receivables
+  // 2. Calculate Customer Invoices & Outstanding Receivables
   invoicesArray.forEach(i => {
     if (i.status === 'draft') return;
-    totalRevenue += parseFloat(i.grandTotal || i.grandtotal || 0);
-    totalReceivables += Math.max(0, parseFloat(i.grandTotal || i.grandtotal || 0) - parseFloat(i.amountPaid || i.amountpaid || 0));
+    const grand = parseFloat(i.grandTotal || i.grand_total || i.grandtotal || 0);
+    const paid = parseFloat(i.amountPaid || i.amount_paid || i.amountpaid || 0);
+    
+    totalRevenue += grand;
+    totalReceivables += Math.max(0, grand - paid);
   });
 
-  // 2. Calculate Supplier Procurement Volume & Active Accounts Payable
+  // 3. Calculate Supplier Procurement Volume & Active Accounts Payable
   purchasesArray.forEach(p => {
-    totalPurchases += parseFloat(p.totalAmount || p.total || 0);
-    totalPayables += Math.max(0, parseFloat(p.totalAmount || p.total || 0) - parseFloat(p.amountPaid || p.amountpaid || 0));
+    const total = parseFloat(p.totalAmount || p.total_amount || p.total || 0);
+    const paid = parseFloat(p.amountPaid || p.amount_paid || p.amountpaid || 0);
+    
+    totalPurchases += total;
+    totalPayables += Math.max(0, total - paid);
   });
 
-  // 3. Calculate Operational Expense Outlays
+  // 4. Calculate Operational Expense Outlays
   expensesArray.forEach(e => {
     totalExpenses += parseFloat(e.amount || 0);
   });
 
-  // 4. Sum Registered Client Advance Reserves
+  // 5. Sum Registered Client Advance Reserves
   customersArray.forEach(c => {
     customerAdvances += parseFloat(c.advanceBalance || c.advancebalance || 0);
   });
 
-  // 5. Calculate Total Real-time Catalog Stock Assets Inventory Valuation
+  // 6. Calculate Total Real-time Catalog Stock Assets Inventory Valuation
   inventoryStock.forEach(p => {
     const stockQty = parseFloat(p.stock || 0);
-    const salePrice = parseFloat(p.sellPrice || p.price || 0);
+    const salePrice = parseFloat(p.sellPrice || p.sell_price || p.price || 0);
     if (stockQty > 0) {
       totalStockAssetValue += (stockQty * salePrice);
     }
   });
 
-  // 6. Compute True Net Profit Margins
+  // 7. Compute True Net Profit Margins
   const netProfit = totalRevenue - totalPurchases - totalExpenses;
   const marginPct = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : '0.0';
 
-  // 7. Bind Values Safely onto the Live Wireframe Layout DOM Elements
+  // 8. Bind Values Safely onto the Live Wireframe Layout DOM Elements
   const bindVal = (id, val, isCurrency = true) => {
     const el = document.getElementById(id);
     if (el) el.textContent = isCurrency ? "₹" + fmt(val) : val;
@@ -233,11 +239,14 @@ function updateDashboard() {
   bindVal('dashInvoiceCount', invoicesArray.filter(i => i.status !== 'draft').length, false);
   bindVal('dashTotalPurchases', totalPurchases);
   bindVal('dashTotalProducts', inventoryStock.length, false);
+  
+  // FIX 1: Bind the new Pending Receivables card we just built!
+  bindVal('dashPendingReceivables', totalReceivables);
 
   // Bottom Business Summary Metrics Layout Row Elements
   bindVal('dashGrossProfit', netProfit);
   bindVal('dashTotalExpenses', totalExpenses);
-  bindVal('dashTotalReceivables', totalReceivables);
+  bindVal('dashTotalReceivables', totalReceivables); // Fallback if you kept the bottom one too
   bindVal('dashTotalPayables', totalPayables);
   bindVal('dashCustomerAdvances', customerAdvances);
   bindVal('dashStockValueMetric', totalStockAssetValue);
@@ -245,8 +254,11 @@ function updateDashboard() {
   const marginEl = document.getElementById('dashProfitMargin');
   if (marginEl) marginEl.textContent = marginPct + "%";
 
-  // 8. Handle Overdue & Low Stock Side Alert Cards
-  const lowStockCount = inventoryStock.filter(p => parseFloat(p.stock || 0) <= (bizProfile.lowStockThreshold || 10)).length;
+  // 9. Handle Overdue & Low Stock Side Alert Cards
+  // FIX 2: Use the safe global LOW_STOCK_THRESHOLD variable
+  const safeThreshold = typeof LOW_STOCK_THRESHOLD !== 'undefined' ? LOW_STOCK_THRESHOLD : 10;
+  const lowStockCount = inventoryStock.filter(p => parseFloat(p.stock || 0) <= safeThreshold).length;
+  
   const lowStockBox = document.getElementById('dashLowStockAlertBox');
   if (lowStockBox) {
     lowStockBox.style.display = lowStockCount > 0 ? 'flex' : 'none';
@@ -262,16 +274,20 @@ function updateDashboard() {
     const txtAmt = document.getElementById('dashOverdueAmountText');
     
     let totalOverdueAmt = 0;
-    overdueInvoices.forEach(i => totalOverdueAmt += (parseFloat(i.grandTotal || i.grandtotal || 0) - parseFloat(i.amountPaid || i.amountpaid || 0)));
+    overdueInvoices.forEach(i => {
+       const g = parseFloat(i.grandTotal || i.grand_total || 0);
+       const p = parseFloat(i.amountPaid || i.amount_paid || 0);
+       totalOverdueAmt += (g - p);
+    });
     
     if (txtCount) txtCount.textContent = `${overdueInvoices.length} Overdue Invoices`;
     if (txtAmt) txtAmt.textContent = `Total amount ₹${fmt(totalOverdueAmt)}`;
   }
 
-  // 9. Compile and Render the "Top Selling Products" Ranking Catalog Rows
-  renderDashTopProductsCatalog();
+  // 10. Compile and Render the "Top Selling Products" Ranking Catalog Rows
+  if (typeof renderDashTopProductsCatalog === 'function') renderDashTopProductsCatalog();
 
-  // 10. Update History Widgets and Refresh Charts
+  // 11. Update History Widgets and Refresh Charts
   if (typeof renderInvoiceLists === 'function') renderInvoiceLists();
   if (typeof renderPurchaseLists === 'function') renderPurchaseLists();
   if (typeof renderDashChart === 'function') renderDashChart();
@@ -282,48 +298,72 @@ function renderDashTopProductsCatalog() {
   const container = document.getElementById('dashTopProducts');
   if (!container) return;
 
-  // Compile total item sales frequencies from saved invoices
+  // FIX 2: Prevent fatal crash if data is still downloading
+  if (typeof invoicesArray === 'undefined' || !Array.isArray(invoicesArray)) {
+    container.innerHTML = `<p style="text-align:center; font-size:0.8rem; color:var(--ink3); padding:20px 0;">Loading data...</p>`;
+    return;
+  }
+
   const productSalesMap = new Map();
 
   invoicesArray.forEach(inv => {
     if (inv.status === 'draft') return;
+    
     (inv.items || []).forEach(it => {
-      const name = it.description || it.product || it.desc || 'Unknown Product';
+      const rawName = it.description || it.product || it.desc || 'Unknown Product';
+      
+      // FIX 1: Normalize the key so "Apple" and "apple" combine their revenue!
+      const lookupKey = rawName.trim().toLowerCase();
+      
       const qty = parseFloat(it.quantity || it.qty || 0);
       const price = parseFloat(it.unitPrice || it.price || 0);
       const itemRevenue = qty * price;
 
-      if (!productSalesMap.has(name)) {
-        productSalesMap.set(name, { name: name, qtySold: 0, revenue: 0 });
+      if (!productSalesMap.has(lookupKey)) {
+        // Store the original rawName so it still looks nice on the screen
+        productSalesMap.set(lookupKey, { name: rawName, qtySold: 0, revenue: 0 });
       }
-      const data = productSalesMap.get(name);
+      
+      const data = productSalesMap.get(lookupKey);
       data.qtySold += qty;
       data.revenue += itemRevenue;
     });
   });
 
-  // Sort descending by highest generated revenue volumes
   const sortedProducts = Array.from(productSalesMap.values())
     .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 5); // Take top 5 lines just like the mockup image
+    .slice(0, 5); 
 
   if (sortedProducts.length === 0) {
-    container.innerHTML = `<p style="text-align:center; font-size:0.8rem; color:var(--ink3); padding:20px 0;">No sales logged this period.</p>`;
+    container.innerHTML = `<p style="text-align:center; font-size:0.8rem; color:var(--ink3); padding:20px 0;">No sales logged yet.</p>`;
     return;
   }
 
+  // FIX 3: Applied robust inline flexbox styling to guarantee the layout doesn't break
   container.innerHTML = sortedProducts.map((p, index) => `
-    <div class="catalog-row">
-      <div class="catalog-item-info">
-        <span class="catalog-index-badge">${index + 1}</span>
-        <div class="catalog-item-text">
-          <span class="catalog-title">${esc(p.name)}</span>
-          <span class="catalog-subtext">${p.qtySold} items sold</span>
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--surface3);">
+      
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="width:28px; height:28px; border-radius:50%; background:var(--surface2); color:var(--ink2); display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;">
+          ${index + 1}
+        </div>
+        <div style="display:flex; flex-direction:column;">
+          <span style="font-weight:700; color:var(--ink); font-size:0.9rem;">${typeof esc === 'function' ? esc(p.name) : p.name}</span>
+          <span style="font-size:0.75rem; color:var(--ink3);">${p.qtySold} items sold</span>
         </div>
       </div>
-      <span class="catalog-valuation">₹${fmt(p.revenue)}</span>
+
+      <span style="font-weight:700; color:var(--accent); font-size:0.95rem;">
+        ₹${typeof fmt === 'function' ? fmt(p.revenue) : p.revenue.toFixed(2)}
+      </span>
+
     </div>
   `).join('');
+  
+  // Remove the bottom border from the very last item for a cleaner look
+  if (container.lastElementChild) {
+      container.lastElementChild.style.borderBottom = 'none';
+  }
 }
 
 // ─── STORE SWITCHER FUNCTION ──────────────────────────────
@@ -361,6 +401,7 @@ async function loadSupabaseData() {
       supabase.from('store_settings').select('store_id, profile_data') 
     ]);
 
+    // Update Dropdown Names
     if (allStoresRes && allStoresRes.data && storeDropdown) {
       Array.from(storeDropdown.options).forEach(opt => {
         const sData = allStoresRes.data.find(s => s.store_id === opt.value);
@@ -370,46 +411,51 @@ async function loadSupabaseData() {
       });
     }
 
-    if (settRes.data && settRes.data.profile_data) { bizProfile = settRes.data.profile_data; } 
-    else { bizProfile = {}; }
+    // FIX 1: Safely mutate bizProfile to preserve memory references across files
+    if (typeof bizProfile === 'undefined') window.bizProfile = {}; // Fallback init
+    Object.keys(bizProfile).forEach(key => delete bizProfile[key]); // Clear old keys
+    if (settRes.data && settRes.data.profile_data) { 
+        Object.assign(bizProfile, settRes.data.profile_data); // Inject new keys safely
+    } 
+    
     if (typeof populateSettingsUI === 'function') populateSettingsUI();
 
-    // Mapping with Type Safety Coercion
-    inventoryStock.length = 0; 
+    // FIX 2: Check for data BEFORE clearing arrays to prevent network wipeouts!
     if (invRes.data) {
+      inventoryStock.length = 0; 
       inventoryStock.push(...invRes.data.map(p => ({ 
         ...p, costPrice: parseFloat(p.cost_price || 0), sellPrice: parseFloat(p.sell_price || 0), gstRate: parseFloat(p.gst_rate || 0), stock: parseFloat(p.stock || 0) 
       })));
-    }
+    } else if (invRes.error) console.error("Inventory fetch error:", invRes.error);
     
-    customersArray.length = 0; 
     if (custRes.data) {
+      customersArray.length = 0; 
       customersArray.push(...custRes.data.map(c => ({ ...c, advanceBalance: parseFloat(c.advanceBalance || 0) })));
-    }
+    } else if (custRes.error) console.error("Customer fetch error:", custRes.error);
     
-    suppliersArray.length = 0; 
     if (suppRes.data) {
+      suppliersArray.length = 0; 
       suppliersArray.push(...suppRes.data.map(s => ({ ...s, paymentTerms: s.payment_terms, advanceBalance: parseFloat(s.advanceBalance || 0) })));
-    }
+    } else if (suppRes.error) console.error("Supplier fetch error:", suppRes.error);
     
-    expensesArray.length = 0;  
     if (expRes.data) {
+      expensesArray.length = 0;  
       expensesArray.push(...expRes.data.map(e => ({ ...e, desc: e.desc_text, amount: parseFloat(e.amount || 0) })));
-    }
+    } else if (expRes.error) console.error("Expense fetch error:", expRes.error);
     
-    invoicesArray.length = 0;  
     if (invcRes.data) {
+      invoicesArray.length = 0;  
       invoicesArray.push(...invcRes.data.map(i => ({
         ...i, subtotal: parseFloat(i.subtotal||0), gstAmount: parseFloat(i.gstAmount||0), discount: parseFloat(i.discount||0), grandTotal: parseFloat(i.grandTotal||0), amountPaid: parseFloat(i.amountPaid||0)
       })));
-    }
+    } else if (invcRes.error) console.error("Invoice fetch error:", invcRes.error);
     
-    purchasesArray.length = 0; 
     if (purRes.data) {
+      purchasesArray.length = 0; 
       purchasesArray.push(...purRes.data.map(p => ({
         ...p, subtotal: parseFloat(p.subtotal||0), gstAmount: parseFloat(p.gstAmount||0), totalAmount: parseFloat(p.totalAmount||0), amountPaid: parseFloat(p.amountPaid||0)
       })));
-    }
+    } else if (purRes.error) console.error("Purchase fetch error:", purRes.error);
 
     if (statusLabel) statusLabel.textContent = 'Supabase Connected';
     const lastSyncLabel = document.getElementById('apiLastSync');
@@ -874,6 +920,45 @@ function renderDashChart() {
   dashChartInstance = new Chart(ctx, chartData);
 }
 
+// ─── MOBILE SIDEBAR LOGIC ───
+document.addEventListener('DOMContentLoaded', () => {
+  const mobileBtn = document.getElementById('mobileMenuBtn');
+  const sidebar = document.getElementById('sidebar');
+  
+  // 1. Create the dark overlay element automatically
+  const overlay = document.createElement('div');
+  overlay.className = 'sidebar-overlay no-print';
+  document.body.appendChild(overlay);
+
+  // 2. The Toggle Engine
+  function toggleMobileMenu() {
+    const isOpen = sidebar.classList.contains('open');
+    if (isOpen) {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('open');
+      if(mobileBtn) mobileBtn.setAttribute('aria-expanded', 'false');
+    } else {
+      sidebar.classList.add('open');
+      overlay.classList.add('open');
+      if(mobileBtn) mobileBtn.setAttribute('aria-expanded', 'true');
+    }
+  }
+
+  // 3. Bind clicks to the button and the dark overlay
+  if (mobileBtn) mobileBtn.addEventListener('click', toggleMobileMenu);
+  overlay.addEventListener('click', toggleMobileMenu);
+
+  // 4. Auto-close the menu when a navigation item is clicked on mobile
+  const navItems = document.querySelectorAll('.nav-item');
+  navItems.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (window.innerWidth <= 900 && sidebar.classList.contains('open')) {
+        toggleMobileMenu();
+      }
+    });
+  });
+});
+
 // Micro internal helper string binder
 function writeText(id, str) { const el = document.getElementById(id); if (el) el.textContent = str; }
 
@@ -885,5 +970,21 @@ window.addEventListener('DOMContentLoaded', () => {
   loadSupabaseData();
   initCustomerAutoFill();
   initSupplierAutoFill();
+  closeInvoiceEditor();
+  closePurchaseEditor();
+  closeCustomerLedger();
+  closeSupplierLedger()
   setTimeout(() => { const layout = document.querySelector('.layout'); if (layout) layout.style.opacity = '1'; }, 50);
+});
+
+// ─── PERFORMANCE FAILSAFE: PREVENT WHITE SCREEN ───
+window.addEventListener('DOMContentLoaded', () => {
+  // Wait exactly 400ms. If the app hasn't painted yet, force it to appear.
+  setTimeout(() => {
+    const layout = document.querySelector('.layout');
+    if (layout && layout.style.opacity === '0') {
+      layout.style.opacity = '1';
+      console.warn("Failsafe triggered: Forced UI paint.");
+    }
+  }, 400); 
 });

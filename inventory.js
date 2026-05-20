@@ -30,22 +30,9 @@ function renderProductGrid(data) {
     return matchesSearch && matchesCat;
   });
 
-  let totalValue = 0, lowCount = 0;
-  inventoryStock.forEach(p => {
-    totalValue += (p.stock || 0) * (p.sellPrice || p.costPrice || 0);
-    if ((p.stock || 0) <= LOW_STOCK_THRESHOLD) lowCount++;
-  });
-
-  const kpiTotal = document.getElementById('invTotalProducts'); if (kpiTotal) kpiTotal.textContent = inventoryStock.length;
-  const kpiVal = document.getElementById('invTotalValue'); if (kpiVal) kpiVal.textContent = fmt(totalValue);
-  const kpiLow = document.getElementById('invLowStockCount'); if (kpiLow) kpiLow.textContent = lowCount;
-  const dashLow = document.getElementById('dashLowStock'); if (dashLow) dashLow.textContent = lowCount;
-  
-  const banner = document.getElementById('lowStockBanner');
-  if (banner) {
-    banner.style.display = lowCount > 0 ? 'flex' : 'none';
-    const bannerText = document.getElementById('lowStockBannerText');
-    if (bannerText) bannerText.textContent = `${lowCount} low stock item${lowCount > 1 ? 's' : ''}`;
+  // ─── SEPARATED KPI LOGIC CALL ───
+  if (typeof updateInventoryKPIs === 'function') {
+    updateInventoryKPIs();
   }
 
   if (!filtered.length) {
@@ -125,7 +112,6 @@ function renderProductGrid(data) {
 }
 
 function filterInventory() { renderProductGrid(); }
-function filterProducts() { renderProductGrid(); }
 function toggleProductView() { renderProductGrid(); }
 
 function refreshInventory() { loadSupabaseData(); }
@@ -236,20 +222,54 @@ async function addProductLocal() {
   if (!id || !name) { toast('Enter Item ID and Name', 'error'); return; }
   
   const btn = document.getElementById('saveProductBtn');
-  setButtonLoading(btn, true, 'Saving...');
+  if (typeof setButtonLoading === 'function') setButtonLoading(btn, true, 'Saving...');
 
+  // 1. Create the payload with BOTH formats so it perfectly matches a freshly loaded item!
   const p = { 
-    id, name, type: document.getElementById('npType').value, barcode: document.getElementById('npBarcode').value.trim(), status: document.getElementById('npStatus').value, category: document.getElementById('npCat').value.trim(), hsn: document.getElementById('npHsn').value.trim(), unit: document.getElementById('npUnit').value.trim(), 
-    sellPrice: parseFloat(document.getElementById('npSellPrice').value) || 0, costPrice: parseFloat(document.getElementById('npCostPrice').value) || 0, gstRate: parseFloat(document.getElementById('npGst').value) || 0, stock: parseFloat(document.getElementById('npStock').value) || 0 
+    id, 
+    store_id: currentStoreId, // Ensure the store_id is attached locally too
+    name, 
+    type: document.getElementById('npType').value, 
+    barcode: document.getElementById('npBarcode').value.trim(), 
+    status: document.getElementById('npStatus').value, 
+    category: document.getElementById('npCat').value.trim(), 
+    hsn: document.getElementById('npHsn').value.trim(), 
+    unit: document.getElementById('npUnit').value.trim(), 
+    
+    // UI bindings
+    sellPrice: parseFloat(document.getElementById('npSellPrice').value) || 0, 
+    costPrice: parseFloat(document.getElementById('npCostPrice').value) || 0, 
+    gstRate: parseFloat(document.getElementById('npGst').value) || 0, 
+    
+    // Database bindings (Prevents crashing in purchase.js before a refresh)
+    sell_price: parseFloat(document.getElementById('npSellPrice').value) || 0, 
+    cost_price: parseFloat(document.getElementById('npCostPrice').value) || 0, 
+    gst_rate: parseFloat(document.getElementById('npGst').value) || 0, 
+    
+    stock: parseFloat(document.getElementById('npStock').value) || 0 
   };
   
-  inventoryStock.push(p);
-  closeModal();
-  syncUI();
-  
-  const { error } = await supabase.from('inventory').insert([{ id: p.id, store_id: currentStoreId, name: p.name, type: p.type, barcode: p.barcode, status: p.status, category: p.category, hsn: p.hsn, unit: p.unit, sell_price: p.sellPrice, cost_price: p.costPrice, gst_rate: p.gstRate, stock: p.stock }]);
-  setButtonLoading(btn, false, 'Add Item');
-  if (error) toast('Cloud save failed.', 'error'); else toast('Product catalog updated!', 'success');
+  // 2. WAIT for the database to confirm it actually saved FIRST
+  const { error } = await supabase.from('inventory').insert([{ 
+      id: p.id, store_id: p.store_id, name: p.name, type: p.type, barcode: p.barcode, 
+      status: p.status, category: p.category, hsn: p.hsn, unit: p.unit, 
+      sell_price: p.sell_price, cost_price: p.cost_price, gst_rate: p.gst_rate, stock: p.stock 
+  }]);
+
+  // 3. Reset the button state
+  if (typeof setButtonLoading === 'function') setButtonLoading(btn, false, 'Add Item');
+
+  // 4. Handle success or failure safely
+  if (error) {
+      console.error("Insert error:", error);
+      toast('Cloud save failed. Item not added.', 'error');
+  } else {
+      // ONLY update the UI if the database successfully accepted the row
+      inventoryStock.push(p);
+      closeModal();
+      if (typeof syncUI === 'function') syncUI();
+      toast('Product catalog updated!', 'success');
+  }
 }
 
 async function saveEditProduct(id) {
@@ -296,4 +316,62 @@ function updateDatalists() {
   if (custDl) custDl.innerHTML = customersArray.map(c => `<option value="${esc(c.name)}">`).join('');
   if (suppDl) suppDl.innerHTML = suppliersArray.map(s => `<option value="${esc(s.name)}">`).join('');
   if (prodDl) prodDl.innerHTML = inventoryStock.map(p => `<option value="${esc(p.name)}">`).join('');
+}
+
+function updateInventoryKPIs() {
+  let totalCostValue = 0;
+  let totalSellValue = 0;
+  let lowCount = 0;
+
+  inventoryStock.forEach(p => {
+    // Safely parse the quantity
+    const qty = parseFloat(p.stock || 0);
+    
+    // Safely look for both snake_case (database) and camelCase (UI) formats
+    const cost = parseFloat(p.cost_price || p.costPrice || 0);
+    const sell = parseFloat(p.sell_price || p.sellPrice || 0);
+    
+    // We only calculate valuation for actual items in the warehouse (qty > 0)
+    // This prevents negative stock (overselling) from skewing your asset value
+    if (qty > 0) {
+      totalCostValue += (qty * cost);
+      totalSellValue += (qty * sell);
+    }
+
+    // Check low stock threshold
+    if (qty <= LOW_STOCK_THRESHOLD) lowCount++;
+  });
+
+  // Helper function to format as Indian Rupees cleanly
+  const formatCurrency = (val) => '₹ ' + val.toLocaleString('en-IN', { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 2 
+  });
+
+  // 1. Update Total Products count
+  const kpiTotal = document.getElementById('invTotalProducts'); 
+  if (kpiTotal) kpiTotal.textContent = inventoryStock.length;
+  
+  // 2. Update Total COST Value
+  const kpiCost = document.getElementById('kpiTotalCostValue'); 
+  if (kpiCost) kpiCost.textContent = formatCurrency(totalCostValue);
+  
+  // 3. Update Total SELLING Value
+  const kpiSell = document.getElementById('kpiTotalSellValue'); 
+  if (kpiSell) kpiSell.textContent = formatCurrency(totalSellValue);
+  
+  // 4. Update Low Stock Counters
+  const kpiLow = document.getElementById('invLowStockCount'); 
+  if (kpiLow) kpiLow.textContent = lowCount;
+  
+  const dashLow = document.getElementById('dashLowStock'); 
+  if (dashLow) dashLow.textContent = lowCount;
+  
+  // 5. Update Low Stock Banner display
+  const banner = document.getElementById('lowStockBanner');
+  if (banner) {
+    banner.style.display = lowCount > 0 ? 'flex' : 'none';
+    const bannerText = document.getElementById('lowStockBannerText');
+    if (bannerText) bannerText.textContent = `${lowCount} low stock item${lowCount > 1 ? 's' : ''}`;
+  }
 }

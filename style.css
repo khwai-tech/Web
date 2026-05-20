@@ -280,7 +280,7 @@ select.form-control { appearance:none; background-image:url("data:image/svg+xml,
 .report-kpi { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
 .kpi-box   { background:var(--surface2); border:1px solid var(--border); border-radius:var(--r-lg); padding:18px 20px; text-align:center; }
 .kpi-label { font-size:0.7rem; color:var(--ink3); font-weight:600; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:8px; }
-.kpi-value { font-family:'Syne',sans-serif; font-size:1.4rem; font-weight:700; color:var(--ink); }
+.kpi-value { font-family:'tabula',sans-serif; font-size:1.4rem; font-weight:700; color:var(--ink); }
 .kpi-sub   { font-size:0.75rem; color:var(--ink2); margin-top:4px; }
 .empty-state   { text-align:center; padding:40px 20px; color:var(--ink3); }
 .empty-state i { font-size:2.5rem; margin-bottom:12px; display:block; }
@@ -1174,6 +1174,119 @@ select.form-control { appearance:none; background-image:url("data:image/svg+xml,
   line-height: 1.1 !important;
   color: var(--ink);
 }
+
+.btn-success {
+  background-color: var(--accent2) !important;
+  border-color: var(--accent2) !important;
+  color: white !important;
+}
+
+/* ─── MOBILE SIDEBAR & OVERLAY ─── */
+.sidebar-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 9998;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: -300px; /* Hidden completely off-screen */
+    height: 100vh;
+    width: 260px;
+    z-index: 9999;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+  }
+  
+  /* When the .open class is added via JS, slide it into view */
+  .sidebar.open {
+    transform: translateX(300px); 
+  }
+}
+
+/* ─── RESPONSIVE GRIDS ─── */
+/* Forces all your settings columns to stack neatly on mobile screens */
+@media (max-width: 768px) {
+  .grid-2, .grid-3, .grid-4, .grid-5 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ─── RESPONSIVE TABLES ─── */
+/* Prevents tables from breaking the page width on phones */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch; /* Smooth momentum scrolling on iOS */
+  margin-bottom: 16px;
+  border-radius: 8px; /* Optional: keeps corners neat */
+}
+
+/* Ensures the table doesn't squish its text to fit the phone screen */
+.table-responsive table,
+.items-table-wrap table,
+.view-table table {
+  min-width: 700px; /* Forces horizontal scroll if screen is smaller than 700px */
+}
+
+/* Ensure your existing items-table-wrap is also scrollable */
+.items-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* ─── INLINE TABLE DROPDOWNS (e.g., GST %) ─── */
+.gst-select-inline {
+  width: 100%;
+  min-width: 60px;       /* Keeps it from collapsing entirely */
+  max-width: 80px;       /* Prevents it from stretching the column */
+  padding: 4px 18px 4px 6px; /* Tight padding, leaving just enough room on the right for the custom arrow */
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  background-color: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  
+  /* The Magic: Hides the bulky default browser arrow */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  
+  /* Replaces it with a tiny, clean SVG arrow */
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 4px center; /* Pushes the arrow tight to the right edge */
+  background-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.gst-select-inline:focus {
+  outline: none;
+  border-color: var(--accent);
+  background-color: var(--surface);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.gst-select-inline:hover {
+  border-color: var(--accent2);
+}
+
+
 
 
 
