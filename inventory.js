@@ -151,9 +151,13 @@ function openAddProduct() {
       <div class="form-group"><label class="form-label">HSN/SAC Code</label><input type="text" class="form-control" id="npHsn" placeholder="8517"></div>
       <div class="form-group"><label class="form-label">Unit Type</label><input type="text" class="form-control" id="npUnit" placeholder="PCS" list="unitList" style="text-transform:uppercase;"></div>
     </div>
-    <div class="grid-2">
-      <div class="form-group"><label class="form-label">Sell Price (₹)</label><input type="number" class="form-control" id="npSellPrice" placeholder="0.00" oninput="calcPreviewMargin()"></div>
-      <div class="form-group"><label class="form-label">Cost Price (₹)</label><input type="number" class="form-control" id="npCostPrice" placeholder="0.00" oninput="calcPreviewMargin()"></div>
+    <div class="grid-3">
+      <div class="form-group"><label class="form-label">Cost Price (₹)</label><input type="number" class="form-control" id="npCostPrice" placeholder="0.00"></div>
+      <div class="form-group"><label class="form-label">Sell Price (₹)</label><input type="number" class="form-control" id="npSellPrice" placeholder="0.00"></div>
+
+  <div class="form-group"><label class="form-label">Margin(%) / Profit(₹)</label>
+
+  <input type="text" class="form-control" id="npMargin" placeholder="10% or 50"></div>
     </div>
     <div class="grid-3">
       <div class="form-group" id="nStockGroup"><label class="form-label">Initial Stock</label><input type="number" class="form-control" id="npStock" placeholder="0" step="0.01"></div>
@@ -167,6 +171,8 @@ function openAddProduct() {
     <div id="marginPreview" style="font-size:0.85rem;color:var(--ink2);margin-bottom:14px"></div>
     <button class="btn btn-primary" id="saveProductBtn" onclick="addProductLocal()"><i class="fas fa-plus"></i> Add Item</button>`;
   document.getElementById('detailModal').classList.add('open');
+
+  setupSmartMarginCalculator();
 }
 
 function calcPreviewMargin() {
@@ -374,4 +380,165 @@ function updateInventoryKPIs() {
     const bannerText = document.getElementById('lowStockBannerText');
     if (bannerText) bannerText.textContent = `${lowCount} low stock item${lowCount > 1 ? 's' : ''}`;
   }
+}
+
+// ─────────────────────────────────────────────
+// SMART SINGLE INPUT MARGIN SYSTEM
+// 50   => ₹50 profit
+// 10%  => 10 percent margin
+// ─────────────────────────────────────────────
+
+function setupSmartMarginCalculator() {
+
+  const cpInput = document.getElementById('npCostPrice');
+  const spInput = document.getElementById('npSellPrice');
+  const marginInput = document.getElementById('npMargin');
+  const preview = document.getElementById('marginPreview');
+
+  if (!cpInput || !spInput || !marginInput) return;
+
+  let lock = false;
+
+  // ─────────────────────────────
+  // Calculate Sell Price
+  // ─────────────────────────────
+  function calculateSellPrice() {
+
+    if (lock) return;
+
+    lock = true;
+
+    const cp = parseFloat(cpInput.value) || 0;
+
+    let marginRaw = marginInput.value.trim();
+
+    if (!marginRaw || cp <= 0) {
+
+      lock = false;
+      return;
+    }
+
+    let sp = cp;
+
+    // Percent Mode
+    if (marginRaw.includes('%')) {
+
+      let percent = parseFloat(
+        marginRaw.replace('%', '')
+      ) || 0;
+
+      sp = cp + (cp * percent / 100);
+
+    }
+
+    // Rupee Mode
+    else {
+
+      let profitRs = parseFloat(marginRaw) || 0;
+
+      sp = cp + profitRs;
+    }
+
+    spInput.value = sp.toFixed(2);
+
+    updatePreview();
+
+    lock = false;
+  }
+
+  // ─────────────────────────────
+  // Reverse Calculation
+  // ─────────────────────────────
+  function calculateFromSellPrice() {
+
+    if (lock) return;
+
+    lock = true;
+
+    const cp = parseFloat(cpInput.value) || 0;
+    const sp = parseFloat(spInput.value) || 0;
+
+    if (cp <= 0 || sp <= 0) {
+
+      lock = false;
+      return;
+    }
+
+    const profitRs = sp - cp;
+    const marginPercent = ((profitRs / cp) * 100);
+
+    // Preserve existing mode
+    if (marginInput.value.includes('%')) {
+
+      marginInput.value =
+        marginPercent.toFixed(2) + '%';
+
+    } else {
+
+      marginInput.value =
+        profitRs.toFixed(2);
+    }
+
+    updatePreview();
+
+    lock = false;
+  }
+
+  // ─────────────────────────────
+  // Preview
+  // ─────────────────────────────
+  function updatePreview() {
+
+    const cp = parseFloat(cpInput.value) || 0;
+    const sp = parseFloat(spInput.value) || 0;
+
+    if (cp <= 0 || sp <= 0) {
+
+      preview.innerHTML = '';
+
+      return;
+    }
+
+    const profitRs = sp - cp;
+    const marginPercent =
+      ((profitRs / cp) * 100);
+
+    preview.innerHTML = `
+      Profit ₹${profitRs.toFixed(2)}
+      &nbsp;•&nbsp;
+      Margin ${marginPercent.toFixed(2)}%
+    `;
+
+    // Loss warning
+    if (sp < cp) {
+
+      preview.innerHTML += `
+        <span style="color:#ff4d4f;font-weight:600;">
+          &nbsp;• LOSS
+        </span>
+      `;
+    }
+  }
+
+  // ─────────────────────────────
+  // Events
+  // ─────────────────────────────
+
+  cpInput.addEventListener(
+    'input',
+    calculateSellPrice
+  );
+
+  marginInput.addEventListener(
+    'input',
+    calculateSellPrice
+  );
+
+  spInput.addEventListener(
+    'input',
+    calculateFromSellPrice
+  );
+
+  // Initial
+  updatePreview();
 }
