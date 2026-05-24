@@ -158,79 +158,6 @@ function toast(msg, type = 'info') {
   }, 3000);
 }
 
-// ─── HELPER CORE: HIGH-DENSITY TOP PRODUCT EXTRACTOR ──────────────────
-function renderDashTopProductsCatalog() {
-  const container = document.getElementById('dashTopProducts');
-  if (!container) return;
-
-  // FIX 2: Prevent fatal crash if data is still downloading
-  if (typeof invoicesArray === 'undefined' || !Array.isArray(invoicesArray)) {
-    container.innerHTML = `<p style="text-align:center; font-size:0.8rem; color:var(--ink3); padding:20px 0;">Loading data...</p>`;
-    return;
-  }
-
-  const productSalesMap = new Map();
-
-  invoicesArray.forEach(inv => {
-    if (inv.status === 'draft') return;
-    
-    (inv.items || []).forEach(it => {
-      const rawName = it.description || it.product || it.desc || 'Unknown Product';
-      
-      // FIX 1: Normalize the key so "Apple" and "apple" combine their revenue!
-      const lookupKey = rawName.trim().toLowerCase();
-      
-      const qty = parseFloat(it.quantity || it.qty || 0);
-      const price = parseFloat(it.unitPrice || it.price || 0);
-      const itemRevenue = qty * price;
-
-      if (!productSalesMap.has(lookupKey)) {
-        // Store the original rawName so it still looks nice on the screen
-        productSalesMap.set(lookupKey, { name: rawName, qtySold: 0, revenue: 0 });
-      }
-      
-      const data = productSalesMap.get(lookupKey);
-      data.qtySold += qty;
-      data.revenue += itemRevenue;
-    });
-  });
-
-  const sortedProducts = Array.from(productSalesMap.values())
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 5); 
-
-  if (sortedProducts.length === 0) {
-    container.innerHTML = `<p style="text-align:center; font-size:0.8rem; color:var(--ink3); padding:20px 0;">No sales logged yet.</p>`;
-    return;
-  }
-
-  // FIX 3: Applied robust inline flexbox styling to guarantee the layout doesn't break
-  container.innerHTML = sortedProducts.map((p, index) => `
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--surface3);">
-      
-      <div style="display:flex; align-items:center; gap:12px;">
-        <div style="width:28px; height:28px; border-radius:50%; background:var(--surface2); color:var(--ink2); display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;">
-          ${index + 1}
-        </div>
-        <div style="display:flex; flex-direction:column;">
-          <span style="font-weight:700; color:var(--ink); font-size:0.9rem;">${typeof esc === 'function' ? esc(p.name) : p.name}</span>
-          <span style="font-size:0.75rem; color:var(--ink3);">${p.qtySold} items sold</span>
-        </div>
-      </div>
-
-      <span style="font-weight:700; color:var(--accent); font-size:0.95rem;">
-        ₹${typeof fmt === 'function' ? fmt(p.revenue) : p.revenue.toFixed(2)}
-      </span>
-
-    </div>
-  `).join('');
-  
-  // Remove the bottom border from the very last item for a cleaner look
-  if (container.lastElementChild) {
-      container.lastElementChild.style.borderBottom = 'none';
-  }
-}
-
 // ─── STORE SWITCHER FUNCTION ──────────────────────────────
 function changeActiveStore() {
   const newStore = document.getElementById('settingStoreSelect').value;
@@ -471,10 +398,6 @@ function downloadDatabaseBackup() {
 //        MISSING ENTERPRISE DASHBOARD CORE EXECUTOR ENCLOSURE
 // ══════════════════════════════════════════════════════════════
 
-let currentDashPeriod = 'all'; // Global state tracker for period metrics
-let activeChartType = 'revpur'; // Global state tracker for Chart.js view types
-let dashChartInstance = null;  // Chart.js instance holder context for safe redraws
-
 // ─── FILTER HELPER BY TIME PERIOD ───
 function isDocInPeriod(dateStr, period) {
   if (period === 'all') return true;
@@ -514,276 +437,95 @@ function setDashPeriod(period, btn) {
 }
 
 // ─── BUTTON TRIGGER: VIEW CHART TYPE OVERRIDES ───
-function switchDashChart(chartType, btn) {
+let activeChartType = 'revpur';
+
+function switchDashChart(chartType, btn = null) {
+
+  // ─────────────────────────────────────────
+  // SAVE ACTIVE TYPE
+  // ─────────────────────────────────────────
   activeChartType = chartType;
-  document.querySelectorAll('.chart-tab').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  
+
+  // ─────────────────────────────────────────
+  // ACTIVE BUTTON UI
+  // ─────────────────────────────────────────
+  document.querySelectorAll('.chart-tab')
+    .forEach(tab => tab.classList.remove('active'));
+
+  if (btn) {
+    btn.classList.add('active');
+  }
+
+  // ─────────────────────────────────────────
+  // DYNAMIC TITLES
+  // ─────────────────────────────────────────
   const titles = {
-    'revpur': 'Revenue vs Purchases Breakdown',
-    'salesrec': 'Volume Analysis (Total Invoices)',
-    'salesamt': 'Sales Trajectory Growth Inflow Curves',
-    'profit': 'Profit Projections margin',
-    'topcat': 'Product Categories Performance'
+
+    revpur:
+      'Revenue vs Purchases',
+
+    salesrec:
+      'Invoice Volume Analytics',
+
+    salesamt:
+      'Sales Growth Trend',
+
+    profit:
+      'Profit Performance',
+
+    topcat:
+      'Category Performance'
+
   };
-  const titleEl = document.getElementById('dashChartTitle');
-  if (titleEl) titleEl.textContent = titles[chartType] || 'Financial Matrix Analytics';
 
-  renderDashChart(); // Re-index datasets and redraw chart layouts
-}
+  // ─────────────────────────────────────────
+  // UPDATE TITLE
+  // ─────────────────────────────────────────
+  const titleEl =
+    document.getElementById('dashChartTitle');
 
-// ─── MASTER ENTRY POINT FOR DATA BINDING WIDGETS ───
-function updateDashboard() {
-  const dashDate = document.getElementById('dashDate');
-  if (dashDate) dashDate.textContent = "Live Financial Metrics Summary: " + dateLabel(today());
-
-  let totalRevenue = 0, totalReceivables = 0, invoiceCount = 0;
-  let totalPurchases = 0, totalPayables = 0;
-  let totalExpenses = 0, customerAdvances = 0;
-
-  // Track product velocity and buyer metrics inside historical memory maps
-  const productVelocity = {}, customerLeaderboard = {}, activityLogs = [];
-
-  // 1. Process Customer Sales Invoices
-  invoicesArray.forEach(i => {
-    if (i.status === 'draft') return;
-    
-    // Log Activity Context
-    activityLogs.push({ date: i.date, text: `Invoice ${i.invoiceId} raised for ${i.customerName}`, type: 'sale', amt: i.grandTotal });
-    
-    if (!isDocInPeriod(i.date, currentDashPeriod)) return;
-
-    totalRevenue += (i.grandTotal || 0);
-    totalReceivables += Math.max(0, (i.grandTotal || 0) - (i.amountPaid || 0));
-    invoiceCount++;
-
-    // Track Customer Volume Metrics
-    const cKey = i.customerName || 'Walk-In Customer';
-    customerLeaderboard[cKey] = (customerLeaderboard[cKey] || 0) + (i.grandTotal || 0);
-
-    // Track Product Sales Item Loops
-    (i.items || []).forEach(it => {
-      const pKey = it.description || it.desc || 'Unknown Item';
-      productVelocity[pKey] = (productVelocity[pKey] || 0) + (parseFloat(it.quantity) || 0);
-    });
-  });
-
-  // 2. Process Supplier Procurement Orders
-  purchasesArray.forEach(p => {
-    activityLogs.push({ date: p.date, text: `Purchase Order ${p.poNumber} booked with ${p.supplier}`, type: 'purchase', amt: p.totalAmount });
-    
-    if (!isDocInPeriod(p.date, currentDashPeriod)) return;
-    
-    totalPurchases += (p.totalAmount || 0);
-    totalPayables += Math.max(0, (p.totalAmount || 0) - (p.amountPaid || 0));
-  });
-
-  // 3. Process Expenditures
-  expensesArray.forEach(e => {
-    activityLogs.push({ date: e.date, text: `Expense logged: ${e.desc || e.category}`, type: 'expense', amt: e.amount });
-    
-    if (!isDocInPeriod(e.date, currentDashPeriod)) return;
-    totalExpenses += (e.amount || 0);
-  });
-
-  // 4. Summarize Credits (Always absolute total value)
-  customersArray.forEach(c => customerAdvances += (c.advanceBalance || 0));
-
-  // Compute Net Net Operational Margins
-  const netProfit = totalRevenue - totalPurchases - totalExpenses;
-  const marginPct = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : '0.0';
-
-  // Bind parameters cleanly straight into HTML interface locations
-  const writeText = (id, str) => { const el = document.getElementById(id); if (el) el.textContent = str; };
-  
-  writeText('dashTotalRevenue', '₹' + fmt(totalRevenue));
-  writeText('dashTotalPurchases', '₹' + fmt(totalPurchases));
-  writeText('dashTotalExpenses', '₹' + fmt(totalExpenses));
-  writeText('dashGrossProfit', '₹' + fmt(netProfit));
-  writeText('dashTotalReceivables', '₹' + fmt(totalReceivables));
-  writeText('dashTotalPayables', '₹' + fmt(totalPayables));
-  writeText('dashCustomerAdvances', '₹' + fmt(customerAdvances));
-  writeText('dashProfitMargin', marginPct + '%');
-  writeText('dashInvCount', invoiceCount);
-
-  // 5. Populate Reminder Flags & Live Notification Overdue Elements
-  const overdueWidget = document.getElementById('dashOverdueWidget');
-  if (overdueWidget) {
-    const outstandingBills = invoicesArray.filter(i => i.status !== 'paid' && i.status !== 'draft');
-    const pill = document.getElementById('dashOverduePill');
-    const pillTxt = document.getElementById('dashOverduePillText');
-    
-    if (outstandingBills.length > 0) {
-      if (pill) pill.style.display = 'inline-flex';
-      if (pillTxt) pillTxt.textContent = `${outstandingBills.length} outstanding bills`;
-      document.getElementById('dashOverdueTotalBar').style.display = 'block';
-      writeText('dashOverdueTotal', '₹' + fmt(totalReceivables));
-      
-      overdueWidget.innerHTML = outstandingBills.slice(0, 3).map(i => `
-        <div class="list-item" onclick="showInvoiceDetail('${esc(i.invoiceId)}')">
-          <div>
-            <div class="list-item-title">${esc(i.invoiceId)} · ${esc(i.customerName)}</div>
-            <div class="list-item-sub">Outstanding Balance: <strong>₹${fmt((i.grandTotal||0)-(i.amountPaid||0))}</strong></div>
-          </div>
-          <div>${getStatusBadge(i.status)}</div>
-        </div>
-      `).join('');
-    } else {
-      if (pill) pill.style.display = 'none';
-      document.getElementById('dashOverdueTotalBar').style.display = 'none';
-      overdueWidget.innerHTML = '<div class="empty-state"><i class="fas fa-check-circle" style="color:var(--accent2)"></i><p style="color:var(--accent2)">All customer pipelines completely cleared!</p></div>';
-    }
+  if (titleEl) {
+    titleEl.textContent =
+      titles[chartType] || 'Business Analytics';
   }
 
-  // 6. Populate Top Customers Leaderboard
-  const topCustWidget = document.getElementById('dashTopCustomers');
-  if (topCustWidget) {
-    const sortedCust = Object.keys(customerLeaderboard).sort((a,b) => customerLeaderboard[b] - customerLeaderboard[a]);
-    topCustWidget.innerHTML = sortedCust.length ? sortedCust.slice(0,3).map((name, idx) => `
-      <div class="list-item">
-        <div><div class="list-item-title"><i class="fas fa-medal" style="color:${idx===0?'#gold':idx===1?'#silver':'#cd7f32'}; margin-right:6px"></i>${esc(name)}</div></div>
-        <div style="text-align:right"><div class="list-item-amount">₹${fmt(customerLeaderboard[name])}</div><div class="list-item-sub">Total Contributed Revenue</div></div>
-      </div>
-    `).join('') : '<div class="empty-state"><i class="fas fa-users"></i><p>Save customer invoices to generate ranks.</p></div>';
+  // ─────────────────────────────────────────
+  // OPTIONAL SUBTITLE
+  // ─────────────────────────────────────────
+  const subtitle =
+    document.getElementById('dashChartSubTitle');
+
+  if (subtitle) {
+
+    const subMap = {
+
+      revpur:
+        'Compare revenue against procurement costs',
+
+      salesrec:
+        'Track invoice generation volume',
+
+      salesamt:
+        'Visualize sales growth patterns',
+
+      profit:
+        'Monitor operational profitability',
+
+      topcat:
+        'Analyze best-performing categories'
+    };
+
+    subtitle.textContent =
+      subMap[chartType] || '';
   }
 
-  // 7. Populate Fast Moving Stock Items List
-  const topProdWidget = document.getElementById('dashTopProducts');
-  if (topProdWidget) {
-    const sortedProds = Object.keys(productVelocity).sort((a,b) => productVelocity[b] - productVelocity[a]);
-    topProdWidget.innerHTML = sortedProds.length ? sortedProds.slice(0, 3).map(pName => {
-      const stockMatch = inventoryStock.find(x => x.name.toLowerCase() === pName.toLowerCase());
-      const remainingStock = stockMatch ? stockMatch.stock : 0;
-      return `
-        <div class="list-item">
-          <div><div class="list-item-title">${esc(pName)}</div><div class="list-item-sub">Current Stock On Hand: ${remainingStock} units</div></div>
-          <div style="text-align:right"><div class="list-item-amount" style="color:var(--accent2)">${productVelocity[pName]} units</div><div class="list-item-sub">Volume Sold</div></div>
-        </div>`;
-    }).join('') : '<div class="empty-state"><i class="fas fa-box"></i><p>Sales velocities show up here after billing.</p></div>';
-  }
-
-  // 8. Render Real-time Activity Feed Logs
-  const feedWidget = document.getElementById('dashActivityFeed');
-  if (feedWidget) {
-    activityLogs.sort((a,b) => new Date(b.date) - new Date(a.date));
-    feedWidget.innerHTML = activityLogs.length ? activityLogs.slice(0, 4).map(log => {
-      let icon = 'fa-file-invoice-dollar', iconColor = 'var(--info)';
-      if (log.type === 'purchase') { icon = 'fa-truck'; iconColor = 'var(--gold)'; }
-      if (log.type === 'expense') { icon = 'fa-wallet'; iconColor = 'var(--danger)'; }
-      return `
-        <div class="list-item" style="padding: 10px 14px;">
-          <div style="display:flex; gap:12px; align-items:center;">
-            <i class="fas ${icon}" style="color:${iconColor}; background:var(--surface2); padding:8px; border-radius:50%; width:16px; text-align:center;"></i>
-            <div><div class="list-item-title" style="font-size:0.85rem">${esc(log.text)}</div><div class="list-item-sub">${dateLabel(log.date)}</div></div>
-          </div>
-          <div style="text-align:right; font-weight:600; font-size:0.85rem;">₹${fmt(log.amt)}</div>
-        </div>`;
-    }).join('') : '<div class="empty-state"><i class="fas fa-stream"></i><p>No transactions registered across this active database.</p></div>';
-  }
-
-  // Run the data visual charts generator
+  // ─────────────────────────────────────────
+  // RE-RENDER CHART
+  // ─────────────────────────────────────────
   renderDashChart();
 }
 
-// ─── DATA RENDERING ENGINE: CHART.JS GRAPH CORE VIA APP.JS ───
-function renderDashChart() {
-  const canvas = document.getElementById('dashMainChart');
-  if (!canvas) return;
-  
-  // Safe Cleanup: Destroy preceding reference footprints before repainting
-  if (dashChartInstance) { dashChartInstance.destroy(); dashChartInstance = null; }
 
-  const ctx = canvas.getContext('2d');
-  
-  // Setup baseline rolling chronological 6-month indexing maps
-  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const labels = [];
-  const monthlyRevenue = Array(6).fill(0);
-  const monthlyPurchases = Array(6).fill(0);
-  const monthlyNet = Array(6).fill(0);
-
-  const now = new Date();
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    labels.push(monthNames[d.getMonth()] + " " + String(d.getFullYear()).slice(-2));
-  }
-
-  // Helper macro index locator
-  const getMonthIndex = (dateStr) => {
-    if (!dateStr) return -1;
-    const d = new Date(dateStr);
-    for (let i = 5; i >= 0; i--) {
-      const target = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      if (d.getFullYear() === target.getFullYear() && d.getMonth() === target.getMonth()) return 5 - i;
-    }
-    return -1;
-  };
-
-  // Compile totals maps sequentially
-  invoicesArray.forEach(i => {
-    if (i.status === 'draft') return;
-    const idx = getMonthIndex(i.date);
-    if (idx >= 0) monthlyRevenue[idx] += (i.grandTotal || 0);
-  });
-  purchasesArray.forEach(p => {
-    const idx = getMonthIndex(p.date);
-    if (idx >= 0) monthlyPurchases[idx] += (p.totalAmount || 0);
-  });
-  for (let idx = 0; idx < 6; idx++) {
-    monthlyNet[idx] = monthlyRevenue[idx] - monthlyPurchases[idx];
-  }
-
-  // Update Chart Header Total Fields dynamically
-  const total6MRev = monthlyRevenue.reduce((a, b) => a + b, 0);
-  const total6MPur = monthlyPurchases.reduce((a, b) => a + b, 0);
-  writeText('dashCMRev', '₹' + fmt(total6MRev));
-  writeText('dashCMPur', '₹' + fmt(total6MPur));
-  writeText('dashCMProfit', '₹' + fmt(total6MRev - total6MPur));
-
-  // Determine structural view configurations based on chart options selected
-  let chartData = {};
-  const themeAccent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#1a4a3a';
-  const themeGold = getComputedStyle(document.documentElement).getPropertyValue('--gold').trim() || '#c8933a';
-
-  if (activeChartType === 'revpur') {
-    chartData = {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [
-          { label: 'Revenue Inflow', data: monthlyRevenue, backgroundColor: themeAccent, borderRadius: 4 },
-          { label: 'Procurement Purchases', data: monthlyPurchases, backgroundColor: themeGold, borderRadius: 4 }
-        ]
-      },
-      options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.03)' } }, x: { grid: { display: false } } } }
-    };
-  } 
-  else if (activeChartType === 'salesamt' || activeChartType === 'profit') {
-    const focusData = activeChartType === 'salesamt' ? monthlyRevenue : monthlyNet;
-    const focusLabel = activeChartType === 'salesamt' ? 'Sales Inflow Progress' : 'Net Operations Margin';
-    chartData = {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [{ label: focusLabel, data: focusData, borderColor: themeAccent, backgroundColor: 'rgba(26, 74, 58, 0.05)', fill: true, tension: 0.3, borderWidth: 3 }]
-      },
-      options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
-    };
-  }
-  else {
-    // Basic fallback context mapping to line view configuration for density
-    chartData = {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [{ label: 'Sales Activity Tracking Index', data: monthlyRevenue, borderColor: themeGold, tension: 0.1, fill: false }]
-      },
-      options: { responsive: true, maintainAspectRatio: false }
-    };
-  }
-
-  dashChartInstance = new Chart(ctx, chartData);
-}
 
 // ─── MOBILE SIDEBAR LOGIC ───
 document.addEventListener('DOMContentLoaded', () => {
@@ -853,3 +595,682 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }, 400); 
 });
+
+
+// ══════════════════════════════════════════════════════════════
+//        PERFECT HYBRID ERP DASHBOARD ENGINE
+// ══════════════════════════════════════════════════════════════
+
+let currentDashPeriod = 'month';
+let dashChartInstance = null;
+
+// ─────────────────────────────────────────────────────────────
+// SAFE HELPERS
+// ─────────────────────────────────────────────────────────────
+function dashWrite(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function safeNum(v) {
+  return parseFloat(v || 0) || 0;
+}
+
+function isDocInPeriod(dateStr, period = 'month') {
+  if (period === 'all') return true;
+  if (!dateStr) return false;
+
+  const docDate = new Date(dateStr);
+  const now = new Date();
+
+  docDate.setHours(0,0,0,0);
+  now.setHours(0,0,0,0);
+
+  const diffDays = Math.floor((now - docDate) / (1000 * 60 * 60 * 24));
+
+  if (period === 'day') return diffDays === 0;
+  if (period === 'week') return diffDays >= 0 && diffDays <= 7;
+  if (period === 'month') return diffDays >= 0 && diffDays <= 30;
+
+  return true;
+}
+
+// ─────────────────────────────────────────────────────────────
+// DASHBOARD MASTER ENGINE
+// ─────────────────────────────────────────────────────────────
+function updateDashboard() {
+
+  // ─── Greeting Logic ───
+  const greeting = document.getElementById('dashGreetingText');
+
+  if (greeting) {
+    const hr = new Date().getHours();
+
+    let text = 'Good Morning';
+
+    if (hr >= 12 && hr < 17) {
+      text = 'Good Afternoon';
+    } else if (hr >= 17 || hr < 4) {
+      text = 'Good Evening';
+    }
+
+    greeting.innerHTML = `${text}, Admin <span style="font-size:1.2rem;">👋</span>`;
+  }
+
+  dashWrite('dashDate', "Here's what's happening in your business today.");
+
+  // ─────────────────────────────────────────────────────────
+  // MASTER METRICS
+  // ─────────────────────────────────────────────────────────
+
+  let totalRevenue = 0;
+  let totalReceivables = 0;
+  let totalPurchases = 0;
+  let totalPayables = 0;
+  let totalExpenses = 0;
+  let customerAdvances = 0;
+  let totalStockValue = 0;
+  let invoiceCount = 0;
+
+  const activityLogs = [];
+  const productSalesMap = new Map();
+  const customerLeaderboard = {};
+
+  // ─────────────────────────────────────────────────────────
+  // INVOICES
+  // ─────────────────────────────────────────────────────────
+
+  invoicesArray.forEach(inv => {
+
+    if (inv.status === 'draft') return;
+
+    if (!isDocInPeriod(inv.date, currentDashPeriod)) return;
+
+    const grand = safeNum(inv.grandTotal || inv.grand_total);
+    const paid = safeNum(inv.amountPaid || inv.amount_paid);
+
+    totalRevenue += grand;
+    totalReceivables += Math.max(0, grand - paid);
+    invoiceCount++;
+
+    // Activity Feed
+    activityLogs.push({
+      type: 'sale',
+      date: inv.date,
+      text: `Invoice ${inv.invoiceId} created for ${inv.customerName}`,
+      amount: grand
+    });
+
+    // Customer Leaderboard
+    const cust = inv.customerName || 'Walk-In Customer';
+    customerLeaderboard[cust] = (customerLeaderboard[cust] || 0) + grand;
+
+    // Product Analytics
+    (inv.items || []).forEach(it => {
+
+      const rawName = it.description || it.product || it.desc || 'Unknown Product';
+
+      const key = rawName.trim().toLowerCase();
+
+      const qty = safeNum(it.quantity || it.qty);
+      const price = safeNum(it.unitPrice || it.price);
+
+      const revenue = qty * price;
+
+      if (!productSalesMap.has(key)) {
+        productSalesMap.set(key, {
+          name: rawName,
+          qtySold: 0,
+          revenue: 0
+        });
+      }
+
+      const data = productSalesMap.get(key);
+
+      data.qtySold += qty;
+      data.revenue += revenue;
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // PURCHASES
+  // ─────────────────────────────────────────────────────────
+
+  purchasesArray.forEach(p => {
+
+    if (!isDocInPeriod(p.date, currentDashPeriod)) return;
+
+    const total = safeNum(p.totalAmount || p.total_amount);
+    const paid = safeNum(p.amountPaid || p.amount_paid);
+
+    totalPurchases += total;
+    totalPayables += Math.max(0, total - paid);
+
+    activityLogs.push({
+      type: 'purchase',
+      date: p.date,
+      text: `Purchase ${p.poNumber} from ${p.supplier}`,
+      amount: total
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // EXPENSES
+  // ─────────────────────────────────────────────────────────
+
+  expensesArray.forEach(e => {
+
+    if (!isDocInPeriod(e.date, currentDashPeriod)) return;
+
+    const amt = safeNum(e.amount);
+
+    totalExpenses += amt;
+
+    activityLogs.push({
+      type: 'expense',
+      date: e.date,
+      text: `Expense: ${e.desc || e.category}`,
+      amount: amt
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // CUSTOMER ADVANCES
+  // ─────────────────────────────────────────────────────────
+
+  customersArray.forEach(c => {
+    customerAdvances += safeNum(c.advanceBalance || c.advancebalance);
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // STOCK VALUE
+  // ─────────────────────────────────────────────────────────
+
+  inventoryStock.forEach(p => {
+
+    const stock = safeNum(p.stock);
+    const price = safeNum(p.sellPrice || p.sell_price || p.price);
+
+    totalStockValue += stock * price;
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // PROFIT CALCULATION
+  // ─────────────────────────────────────────────────────────
+
+  const netProfit = totalRevenue - totalPurchases - totalExpenses;
+
+  const marginPct = totalRevenue > 0
+    ? ((netProfit / totalRevenue) * 100).toFixed(1)
+    : '0.0';
+
+  // ─────────────────────────────────────────────────────────
+  // KPI BINDING
+  // ─────────────────────────────────────────────────────────
+
+  dashWrite('dashTotalRevenue', '₹' + fmt(totalRevenue));
+  dashWrite('dashInvoiceCount', invoiceCount);
+  dashWrite('dashTotalPurchases', '₹' + fmt(totalPurchases));
+  dashWrite('dashTotalProducts', inventoryStock.length);
+  dashWrite('dashPendingReceivables', '₹' + fmt(totalReceivables));
+
+  dashWrite('dashGrossProfit', '₹' + fmt(netProfit));
+  dashWrite('dashTotalExpenses', '₹' + fmt(totalExpenses));
+  dashWrite('dashProfitMargin', marginPct + '%');
+  dashWrite('dashTotalReceivables', '₹' + fmt(totalReceivables));
+  dashWrite('dashStockValueMetric', '₹' + fmt(totalStockValue));
+
+  // ─────────────────────────────────────────────────────────
+  // LOW STOCK ALERT
+  // ─────────────────────────────────────────────────────────
+
+  const threshold = typeof LOW_STOCK_THRESHOLD !== 'undefined'
+    ? LOW_STOCK_THRESHOLD
+    : 10;
+
+  const lowStockCount = inventoryStock.filter(p => safeNum(p.stock) <= threshold).length;
+
+  const lowBox = document.getElementById('dashLowStockAlertBox');
+
+  if (lowBox) {
+    lowBox.style.display = lowStockCount > 0 ? 'flex' : 'none';
+  }
+
+  dashWrite('dashLowStockCountText', `${lowStockCount} Low Stock Items`);
+
+  // ─────────────────────────────────────────────────────────
+  // OVERDUE ALERTS
+  // ─────────────────────────────────────────────────────────
+
+  const overdueInvoices = invoicesArray.filter(i => i.status === 'overdue');
+
+  let overdueAmount = 0;
+
+  overdueInvoices.forEach(i => {
+    overdueAmount += Math.max(
+      0,
+      safeNum(i.grandTotal) - safeNum(i.amountPaid)
+    );
+  });
+
+  const overdueBox = document.getElementById('dashOverdueAlertBox');
+
+  if (overdueBox) {
+    overdueBox.style.display = overdueInvoices.length > 0 ? 'flex' : 'none';
+  }
+
+  dashWrite('dashOverdueCountText', `${overdueInvoices.length} Overdue Invoices`);
+  dashWrite('dashOverdueAmountText', `Total amount ₹${fmt(overdueAmount)}`);
+
+  // ─────────────────────────────────────────────────────────
+  // TOP PRODUCTS
+  // ─────────────────────────────────────────────────────────
+
+  renderDashTopProducts(productSalesMap);
+
+  // ─────────────────────────────────────────────────────────
+  // ACTIVITY FEED
+  // ─────────────────────────────────────────────────────────
+
+  renderDashActivity(activityLogs);
+
+  // ─────────────────────────────────────────────────────────
+  // CHARTS
+  // ─────────────────────────────────────────────────────────
+
+  renderDashChart();
+}
+
+// ─────────────────────────────────────────────────────────────
+// TOP PRODUCTS RENDERER
+// ─────────────────────────────────────────────────────────────
+function renderDashTopProducts(productSalesMap) {
+
+  const container = document.getElementById('dashTopProducts');
+
+  if (!container) return;
+
+  const sorted = Array.from(productSalesMap.values())
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5);
+
+  if (!sorted.length) {
+    container.innerHTML = `
+      <div style="padding:20px; text-align:center; color:var(--ink3);">
+        No sales yet.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = sorted.map((p, idx) => `
+
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--surface3);">
+
+      <div style="display:flex; align-items:center; gap:12px;">
+
+        <div style="width:28px; height:28px; border-radius:50%; background:var(--surface2); display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;">
+          ${idx + 1}
+        </div>
+
+        <div>
+          <div style="font-weight:700; font-size:0.88rem;">${esc(p.name)}</div>
+          <div style="font-size:0.74rem; color:var(--ink3);">
+            ${p.qtySold} items sold
+          </div>
+        </div>
+      </div>
+
+      <div style="font-weight:700; color:var(--accent);">
+        ₹${fmt(p.revenue)}
+      </div>
+
+    </div>
+
+  `).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// ACTIVITY FEED
+// ─────────────────────────────────────────────────────────────
+function renderDashActivity(logs) {
+
+  const feed = document.getElementById('dashActivityFeed');
+
+  if (!feed) return;
+
+  logs.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  if (!logs.length) {
+    feed.innerHTML = `
+      <div style="padding:20px; text-align:center; color:var(--ink3);">
+        No activity yet.
+      </div>
+    `;
+    return;
+  }
+
+  feed.innerHTML = logs.slice(0, 6).map(log => {
+
+    let icon = 'fa-file-invoice';
+    let color = 'var(--info)';
+
+    if (log.type === 'purchase') {
+      icon = 'fa-shopping-cart';
+      color = 'var(--gold)';
+    }
+
+    if (log.type === 'expense') {
+      icon = 'fa-wallet';
+      color = 'var(--danger)';
+    }
+
+    return `
+
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--surface3);">
+
+        <div style="display:flex; align-items:center; gap:12px;">
+
+          <div style="width:34px; height:34px; border-radius:50%; background:var(--surface2); display:flex; align-items:center; justify-content:center; color:${color};">
+            <i class="fas ${icon}"></i>
+          </div>
+
+          <div>
+            <div style="font-size:0.84rem; font-weight:600;">
+              ${esc(log.text)}
+            </div>
+            <div style="font-size:0.72rem; color:var(--ink3);">
+              ${dateLabel(log.date)}
+            </div>
+          </div>
+
+        </div>
+
+        <div style="font-weight:700; font-size:0.85rem;">
+          ₹${fmt(log.amount)}
+        </div>
+
+      </div>
+
+    `;
+
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// CHART ENGINE
+// ─────────────────────────────────────────────────────────────
+function renderDashChart() {
+
+  const canvas =
+    document.getElementById('dashMainChart');
+
+  if (!canvas) return;
+
+  // Destroy previous chart
+  if (dashChartInstance) {
+    dashChartInstance.destroy();
+  }
+
+  const ctx = canvas.getContext('2d');
+
+  // ─────────────────────────────────────────
+  // SETTINGS
+  // ─────────────────────────────────────────
+  const scope =
+    document.getElementById('chartScopeSelect')
+    ?.value || 'month';
+
+  const totalMonths =
+    scope === 'year' ? 12 : 6;
+
+  const labels = [];
+
+  const sales =
+    Array(totalMonths).fill(0);
+
+  const purchases =
+    Array(totalMonths).fill(0);
+
+  const profits =
+    Array(totalMonths).fill(0);
+
+  const invoiceCounts =
+    Array(totalMonths).fill(0);
+
+  const now = new Date();
+
+  // ─────────────────────────────────────────
+  // LABELS
+  // ─────────────────────────────────────────
+  for (let i = totalMonths - 1; i >= 0; i--) {
+
+    const d = new Date(
+      now.getFullYear(),
+      now.getMonth() - i,
+      1
+    );
+
+    labels.push(
+      d.toLocaleString('default', {
+        month: 'short'
+      })
+    );
+  }
+
+  // ─────────────────────────────────────────
+  // MONTH INDEX
+  // ─────────────────────────────────────────
+  function monthIndex(dateStr) {
+
+    if (!dateStr) return -1;
+
+    const d = new Date(dateStr);
+
+    for (let i = totalMonths - 1; i >= 0; i--) {
+
+      const target = new Date(
+        now.getFullYear(),
+        now.getMonth() - i,
+        1
+      );
+
+      if (
+        d.getMonth() === target.getMonth() &&
+        d.getFullYear() === target.getFullYear()
+      ) {
+        return totalMonths - 1 - i;
+      }
+    }
+
+    return -1;
+  }
+
+  // ─────────────────────────────────────────
+  // INVOICE DATA
+  // ─────────────────────────────────────────
+  invoicesArray.forEach(i => {
+
+    if (i.status === 'draft') return;
+
+    const idx = monthIndex(i.date);
+
+    if (idx < 0) return;
+
+    const grand =
+      safeNum(i.grandTotal);
+
+    sales[idx] += grand;
+
+    invoiceCounts[idx] += 1;
+  });
+
+  // ─────────────────────────────────────────
+  // PURCHASE DATA
+  // ─────────────────────────────────────────
+  purchasesArray.forEach(p => {
+
+    const idx = monthIndex(p.date);
+
+    if (idx < 0) return;
+
+    purchases[idx] +=
+      safeNum(p.totalAmount);
+  });
+
+  // ─────────────────────────────────────────
+  // PROFIT DATA
+  // ─────────────────────────────────────────
+  for (let i = 0; i < totalMonths; i++) {
+
+    profits[i] =
+      sales[i] - purchases[i];
+  }
+
+  // ─────────────────────────────────────────
+  // CHART MODES
+  // ─────────────────────────────────────────
+  let datasets = [];
+  let chartType = 'bar';
+
+  // Revenue vs Purchases
+  if (activeChartType === 'revpur') {
+
+    datasets = [
+
+      {
+        label: 'Sales',
+        data: sales,
+        borderRadius: 8
+      },
+
+      {
+        label: 'Purchases',
+        data: purchases,
+        borderRadius: 8
+      }
+    ];
+  }
+
+  // Invoice Volume
+  else if (activeChartType === 'salesrec') {
+
+    chartType = 'line';
+
+    datasets = [
+
+      {
+        label: 'Invoices',
+        data: invoiceCounts,
+        tension: 0.4,
+        fill: true
+      }
+    ];
+  }
+
+  // Sales Trend
+  else if (activeChartType === 'salesamt') {
+
+    chartType = 'line';
+
+    datasets = [
+
+      {
+        label: 'Sales Growth',
+        data: sales,
+        tension: 0.45,
+        fill: true
+      }
+    ];
+  }
+
+  // Profit
+  else if (activeChartType === 'profit') {
+
+    chartType = 'line';
+
+    datasets = [
+
+      {
+        label: 'Profit',
+        data: profits,
+        tension: 0.45,
+        fill: true
+      }
+    ];
+  }
+
+  // Default fallback
+  else {
+
+    datasets = [
+
+      {
+        label: 'Sales',
+        data: sales,
+        borderRadius: 8
+      }
+    ];
+  }
+
+  // ─────────────────────────────────────────
+  // RENDER CHART
+  // ─────────────────────────────────────────
+  dashChartInstance = new Chart(ctx, {
+
+    type: chartType,
+
+    data: {
+      labels,
+      datasets
+    },
+
+    options: {
+
+      responsive: true,
+
+      maintainAspectRatio: false,
+
+      interaction: {
+        intersect: false,
+        mode: 'index'
+      },
+
+      plugins: {
+
+        legend: {
+          position: 'top'
+        },
+
+        tooltip: {
+          enabled: true
+        }
+      },
+
+      scales: {
+
+        x: {
+          grid: {
+            display: false
+          }
+        },
+
+        y: {
+          beginAtZero: true
+        }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// PERIOD FILTER
+// ─────────────────────────────────────────────────────────────
+function updateDashboardMetrics() {
+
+  const sel = document.getElementById('dashPeriodSelect');
+
+  currentDashPeriod = sel ? sel.value : 'month';
+
+  updateDashboard();
+}
