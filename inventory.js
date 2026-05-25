@@ -13,6 +13,7 @@ function fallbackStock() {
 }
 
 function renderInventoryTable(data) { renderProductGrid(data); }
+function filterProducts() { renderProductGrid(); }
 
 function renderProductGrid(data) {
   const container = document.getElementById('productGrid');
